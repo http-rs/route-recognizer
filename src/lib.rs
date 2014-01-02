@@ -7,8 +7,46 @@ pub enum Handler {
   StringHandler(~str)
 }
 
-struct Router {
-  nfa: NFA,
+struct Metadata {
+  statics: uint,
+  dynamics: uint,
+  stars: uint
+}
+
+impl Metadata {
+  pub fn new() -> Metadata {
+    Metadata{ statics: 0, dynamics: 0, stars: 0 }
+  }
+}
+
+impl TotalOrd for Metadata {
+  fn cmp(&self, other: &Metadata) -> Ordering {
+    if self.stars > other.stars {
+      Less
+    } else if self.stars < other.stars {
+      Greater
+    } else if self.dynamics > other.dynamics {
+      Less
+    } else if self.dynamics < other.dynamics {
+      Greater
+    } else if self.statics > other.statics {
+      Less
+    } else if self.statics < other.statics {
+      Greater
+    } else {
+      Equal
+    }
+  }
+}
+
+impl TotalEq for Metadata {
+  fn equals(&self, other: &Metadata) -> bool {
+    self.statics == other.statics && self.dynamics == other.dynamics && self.stars == other.stars
+  }
+}
+
+pub struct Router {
+  nfa: NFA<Metadata>,
   handlers: HashMap<uint, Handler>
 }
 
@@ -24,18 +62,22 @@ impl Router {
 
     let nfa = &mut self.nfa;
     let mut state = 0;
+    let mut metadata = Metadata::new();
 
     for (i, segment) in route.split('/').enumerate() {
       if i > 0 { state = nfa.put(state, CharacterClass::valid_char('/')); }
 
       if segment.char_at(0) == ':' {
         state = process_dynamic_segment(nfa, state);
+        metadata.dynamics += 1;
       } else {
         state = process_static_segment(segment, nfa, state);
+        metadata.statics += 1;
       }
     }
 
     nfa.acceptance(state);
+    nfa.metadata(state, metadata);
     self.handlers.insert(state, dest);
   }
 
@@ -48,12 +90,15 @@ impl Router {
 
     match states {
       Err(str) => Err(str),
-      Ok(states) => Ok(self.handlers.get(&states[0]))
+      Ok(mut states) => {
+        states.sort_by(|a, b| a.metadata.get_ref().cmp(b.metadata.get_ref()));
+        Ok(self.handlers.get(&states.last().index))
+      }
     }
   }
 }
 
-fn process_static_segment(segment: &str, nfa: &mut NFA, mut state: uint) -> uint {
+fn process_static_segment<T>(segment: &str, nfa: &mut NFA<T>, mut state: uint) -> uint {
   for char in segment.chars() {
     state = nfa.put(state, CharacterClass::valid_char(char));
   }
@@ -61,7 +106,7 @@ fn process_static_segment(segment: &str, nfa: &mut NFA, mut state: uint) -> uint
   state
 }
 
-fn process_dynamic_segment(nfa: &mut NFA, mut state: uint) -> uint {
+fn process_dynamic_segment<T>(nfa: &mut NFA<T>, mut state: uint) -> uint {
   state = nfa.put(state, CharacterClass::invalid_char('/'));
   nfa.put_state(state, state);
 
@@ -90,5 +135,25 @@ fn ambiguous_router() {
 
   match *router.recognize("/posts/1").unwrap() {
     StringHandler(ref str) => assert!(str == &~"id", "/posts/1 matched")
+  }
+
+  match *router.recognize("/posts/new").unwrap() {
+    StringHandler(ref str) => assert!(str == &~"new", "/posts/new matched")
+  }
+}
+
+#[test]
+fn ambiguous_router_b() {
+  let mut router = Router::new();
+
+  router.add("/posts/:id", StringHandler(~"id"));
+  router.add("/posts/new", StringHandler(~"new"));
+
+  match *router.recognize("/posts/1").unwrap() {
+    StringHandler(ref str) => assert!(str == &~"id", "/posts/1 matched")
+  }
+
+  match *router.recognize("/posts/new").unwrap() {
+    StringHandler(ref str) => assert!(str == &~"new", "/posts/new matched")
   }
 }

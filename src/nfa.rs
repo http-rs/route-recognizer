@@ -38,30 +38,37 @@ impl CharacterClass {
   }
 }
 
-struct State {
+struct State<T> {
   index: uint,
   chars: CharacterClass,
   next_states: ~[uint],
-  acceptance: bool
+  acceptance: bool,
+  metadata: Option<T>
 }
 
-impl State {
-  pub fn new(index: uint, chars: CharacterClass) -> State {
-    State{ index: index, chars: chars, next_states: ~[], acceptance: false }
+impl<T> Eq for State<T> {
+  fn eq(&self, other: &State<T>) -> bool {
+    self.index == other.index
   }
 }
 
-pub struct NFA {
-  states: ~[State]
+impl<T> State<T> {
+  pub fn new(index: uint, chars: CharacterClass) -> State<T> {
+    State{ index: index, chars: chars, next_states: ~[], acceptance: false, metadata: None }
+  }
 }
 
-impl NFA {
-  pub fn new() -> NFA {
+pub struct NFA<T> {
+  states: ~[State<T>]
+}
+
+impl<T> NFA<T> {
+  pub fn new() -> NFA<T> {
     let root = State::new(0, CharacterClass::valid(""));
     NFA{ states: ~[root] }
   }
 
-  pub fn process<'a>(&'a self, string: &str) -> Result<~[uint], ~str> {
+  pub fn process<'a>(&'a self, string: &str) -> Result<~[&'a State<T>], ~str> {
     let mut current = ~[self.get(0)];
 
     for char in string.chars() {
@@ -75,7 +82,7 @@ impl NFA {
     }
 
     let returned = current.iter().filter_map(|&state| {
-      if state.acceptance { Some(state.index) } else { None }
+      if state.acceptance { Some(state) } else { None }
     }).to_owned_vec();
 
     if returned.is_empty() {
@@ -85,7 +92,7 @@ impl NFA {
     }
   }
 
-  fn process_char<'a>(&'a self, states: ~[&State], char: &char) -> ~[&'a State] {
+  fn process_char<'a>(&'a self, states: ~[&State<T>], char: &char) -> ~[&'a State<T>] {
     let mut returned = ~[];
 
     for state in states.iter() {
@@ -101,11 +108,11 @@ impl NFA {
     returned
   }
 
-  pub fn get<'a>(&'a self, state: uint) -> &'a State {
+  pub fn get<'a>(&'a self, state: uint) -> &'a State<T> {
     &self.states[state]
   }
 
-  pub fn get_mut<'a>(&'a mut self, state: uint) -> &'a mut State {
+  pub fn get_mut<'a>(&'a mut self, state: uint) -> &'a mut State<T> {
     &mut self.states[state]
   }
 
@@ -134,6 +141,10 @@ impl NFA {
     self.get_mut(index).acceptance = true;
   }
 
+  pub fn metadata(&mut self, index: uint, metadata: T) {
+    self.get_mut(index).metadata = Some(metadata);
+  }
+
   fn new_state(&mut self, chars: CharacterClass) -> uint {
     let index = self.states.len();
     let state = State::new(index, chars);
@@ -144,7 +155,7 @@ impl NFA {
 
 #[test]
 fn basic_test() {
-  let mut nfa = NFA::new();
+  let mut nfa = NFA::<()>::new();
   let a = nfa.put(0, CharacterClass::valid("h"));
   let b = nfa.put(a, CharacterClass::valid("e"));
   let c = nfa.put(b, CharacterClass::valid("l"));
@@ -154,12 +165,12 @@ fn basic_test() {
 
   let states = nfa.process("hello");
 
-  assert!(states.unwrap() == ~[e], "You didn't get the right final state");
+  assert!(states.unwrap() == ~[nfa.get(e)], "You didn't get the right final state");
 }
 
 #[test]
 fn multiple_solutions() {
-  let mut nfa = NFA::new();
+  let mut nfa = NFA::<()>::new();
   let a1 = nfa.put(0, CharacterClass::valid("n"));
   let b1 = nfa.put(a1, CharacterClass::valid("e"));
   let c1 = nfa.put(b1, CharacterClass::valid("w"));
@@ -172,12 +183,12 @@ fn multiple_solutions() {
 
   let states = nfa.process("new");
 
-  assert!(states.unwrap() == ~[c1, c2], "The two states were not found");
+  assert!(states.unwrap() == ~[nfa.get(c1), nfa.get(c2)], "The two states were not found");
 }
 
 #[test]
 fn multiple_paths() {
-  let mut nfa = NFA::new();
+  let mut nfa = NFA::<()>::new();
   let a = nfa.put(0, CharacterClass::valid("t"));   // t
   let b1 = nfa.put(a, CharacterClass::valid("h"));  // th
   let c1 = nfa.put(b1, CharacterClass::valid("o")); // tho
@@ -196,15 +207,15 @@ fn multiple_paths() {
   let thom = nfa.process("thom");
   let nope = nfa.process("nope");
 
-  assert!(thomas.unwrap() == ~[f1], "thomas was parsed correctly");
-  assert!(tom.unwrap() == ~[c2], "tom was parsed correctly");
+  assert!(thomas.unwrap() == ~[nfa.get(f1)], "thomas was parsed correctly");
+  assert!(tom.unwrap() == ~[nfa.get(c2)], "tom was parsed correctly");
   assert!(thom.is_err(), "thom didn't reach an acceptance state");
   assert!(nope.is_err(), "nope wasn't parsed");
 }
 
 #[test]
 fn repetitions() {
-  let mut nfa = NFA::new();
+  let mut nfa = NFA::<()>::new();
   let a = nfa.put(0, CharacterClass::valid("p"));   // p
   let b = nfa.put(a, CharacterClass::valid("o"));   // po
   let c = nfa.put(b, CharacterClass::valid("s"));   // pos
@@ -220,14 +231,14 @@ fn repetitions() {
   let new_post = nfa.process("posts/new");
   let invalid = nfa.process("posts/");
 
-  assert!(post.unwrap() == ~[g], "posts/1 was parsed");
-  assert!(new_post.unwrap() == ~[g], "posts/new was parsed");
+  assert!(post.unwrap() == ~[nfa.get(g)], "posts/1 was parsed");
+  assert!(new_post.unwrap() == ~[nfa.get(g)], "posts/new was parsed");
   assert!(invalid.is_err(), "posts/ was invalid");
 }
 
 #[test]
 fn repetitions_with_ambiguous() {
-  let mut nfa = NFA::new();
+  let mut nfa = NFA::<()>::new();
   let a  = nfa.put(0, CharacterClass::valid("p"));   // p
   let b  = nfa.put(a, CharacterClass::valid("o"));   // po
   let c  = nfa.put(b, CharacterClass::valid("s"));   // pos
@@ -248,7 +259,7 @@ fn repetitions_with_ambiguous() {
   let ambiguous = nfa.process("posts/new");
   let invalid = nfa.process("posts/");
 
-  assert!(post.unwrap() == ~[g1], "posts/1 was parsed");
-  assert!(ambiguous.unwrap() == ~[g1, i2], "posts/new was ambiguous");
+  assert!(post.unwrap() == ~[nfa.get(g1)], "posts/1 was parsed");
+  assert!(ambiguous.unwrap() == ~[nfa.get(g1), nfa.get(i2)], "posts/new was ambiguous");
   assert!(invalid.is_err(), "posts/ was invalid");
 }

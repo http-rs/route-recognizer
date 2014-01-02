@@ -45,17 +45,17 @@ impl TotalEq for Metadata {
   }
 }
 
-pub struct Router {
+pub struct Router<T> {
   nfa: NFA<Metadata>,
-  handlers: HashMap<uint, Handler>
+  handlers: HashMap<uint, T>
 }
 
-impl Router {
-  pub fn new() -> Router {
+impl<T> Router<T> {
+  pub fn new() -> Router<T> {
     Router{ nfa: NFA::new(), handlers: HashMap::new() }
   }
 
-  pub fn add(&mut self, mut route: &str, dest: Handler) {
+  pub fn add(&mut self, mut route: &str, dest: T) {
     if route.char_at(0) == '/' {
       route = route.slice_from(1);
     }
@@ -81,7 +81,7 @@ impl Router {
     self.handlers.insert(state, dest);
   }
 
-  pub fn recognize<'a>(&'a self, mut path: &str) -> Result<&'a Handler, ~str> {
+  pub fn recognize<'a>(&'a self, mut path: &str) -> Result<&'a T, ~str> {
     if path.char_at(0) == '/' {
       path = path.slice_from(1);
     }
@@ -115,7 +115,7 @@ fn process_dynamic_segment<T>(nfa: &mut NFA<T>, mut state: uint) -> uint {
 
 #[test]
 fn basic_router() {
-  let mut router = Router::new();
+  let mut router = Router::<Handler>::new();
 
   router.add("/thomas", StringHandler(~"Thomas"));
   router.add("/tom", StringHandler(~"Tom"));
@@ -128,7 +128,7 @@ fn basic_router() {
 
 #[test]
 fn ambiguous_router() {
-  let mut router = Router::new();
+  let mut router = Router::<Handler>::new();
 
   router.add("/posts/new", StringHandler(~"new"));
   router.add("/posts/:id", StringHandler(~"id"));
@@ -144,7 +144,7 @@ fn ambiguous_router() {
 
 #[test]
 fn ambiguous_router_b() {
-  let mut router = Router::new();
+  let mut router = Router::<Handler>::new();
 
   router.add("/posts/:id", StringHandler(~"id"));
   router.add("/posts/new", StringHandler(~"new"));

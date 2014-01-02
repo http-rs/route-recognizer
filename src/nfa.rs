@@ -126,6 +126,10 @@ impl NFA {
     state
   }
 
+  pub fn put_state(&mut self, index: uint, child: uint) {
+    self.get_mut(index).next_states.push(child);
+  }
+
   pub fn acceptance(&mut self, index: uint) {
     self.get_mut(index).acceptance = true;
   }
@@ -196,4 +200,55 @@ fn multiple_paths() {
   assert!(tom.unwrap() == ~[c2], "tom was parsed correctly");
   assert!(thom.is_err(), "thom didn't reach an acceptance state");
   assert!(nope.is_err(), "nope wasn't parsed");
+}
+
+#[test]
+fn repetitions() {
+  let mut nfa = NFA::new();
+  let a = nfa.put(0, CharacterClass::valid("p"));   // p
+  let b = nfa.put(a, CharacterClass::valid("o"));   // po
+  let c = nfa.put(b, CharacterClass::valid("s"));   // pos
+  let d = nfa.put(c, CharacterClass::valid("t"));   // post
+  let e = nfa.put(d, CharacterClass::valid("s"));   // posts
+  let f = nfa.put(e, CharacterClass::valid("/"));   // posts/
+  let g = nfa.put(f, CharacterClass::invalid("/")); // posts/[^/]
+  nfa.put_state(g, g);
+
+  nfa.acceptance(g);
+
+  let post = nfa.process("posts/1");
+  let new_post = nfa.process("posts/new");
+  let invalid = nfa.process("posts/");
+
+  assert!(post.unwrap() == ~[g], "posts/1 was parsed");
+  assert!(new_post.unwrap() == ~[g], "posts/new was parsed");
+  assert!(invalid.is_err(), "posts/ was invalid");
+}
+
+#[test]
+fn repetitions_with_ambiguous() {
+  let mut nfa = NFA::new();
+  let a  = nfa.put(0, CharacterClass::valid("p"));   // p
+  let b  = nfa.put(a, CharacterClass::valid("o"));   // po
+  let c  = nfa.put(b, CharacterClass::valid("s"));   // pos
+  let d  = nfa.put(c, CharacterClass::valid("t"));   // post
+  let e  = nfa.put(d, CharacterClass::valid("s"));   // posts
+  let f  = nfa.put(e, CharacterClass::valid("/"));   // posts/
+  let g1 = nfa.put(f, CharacterClass::invalid("/")); // posts/[^/]
+  let g2 = nfa.put(f, CharacterClass::valid("n"));   // posts/n
+  let h2 = nfa.put(g2, CharacterClass::valid("e"));  // posts/ne
+  let i2 = nfa.put(h2, CharacterClass::valid("w"));  // posts/new
+
+  nfa.put_state(g1, g1);
+
+  nfa.acceptance(g1);
+  nfa.acceptance(i2);
+
+  let post = nfa.process("posts/1");
+  let ambiguous = nfa.process("posts/new");
+  let invalid = nfa.process("posts/");
+
+  assert!(post.unwrap() == ~[g1], "posts/1 was parsed");
+  assert!(ambiguous.unwrap() == ~[g1, i2], "posts/new was ambiguous");
+  assert!(invalid.is_err(), "posts/ was invalid");
 }

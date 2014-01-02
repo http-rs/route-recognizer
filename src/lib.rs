@@ -122,7 +122,7 @@ fn basic_router() {
   router.add("/wycats", StringHandler(~"Yehuda"));
 
   match *router.recognize("/thomas").unwrap() {
-    StringHandler(ref str) => assert!(str == &~"Thomas", "/thomas matched")
+    StringHandler(ref str) => assert!(str == &~"Thomas", "/thomas didn't match")
   }
 }
 
@@ -134,11 +134,11 @@ fn ambiguous_router() {
   router.add("/posts/:id", StringHandler(~"id"));
 
   match *router.recognize("/posts/1").unwrap() {
-    StringHandler(ref str) => assert!(str == &~"id", "/posts/1 matched")
+    StringHandler(ref str) => assert!(str == &~"id", "/posts/1 didn't match")
   }
 
   match *router.recognize("/posts/new").unwrap() {
-    StringHandler(ref str) => assert!(str == &~"new", "/posts/new matched")
+    StringHandler(ref str) => assert!(str == &~"new", "/posts/new didn't match")
   }
 }
 
@@ -150,10 +150,10 @@ fn ambiguous_router_b() {
   router.add("/posts/new", StringHandler(~"new"));
 
   match *router.recognize("/posts/1").unwrap() {
-    StringHandler(ref str) => assert!(str == &~"id", "/posts/1 matched")
+    StringHandler(ref str) => assert!(str == &~"id", "/posts/1 didn't match")
   }
 
   match *router.recognize("/posts/new").unwrap() {
-    StringHandler(ref str) => assert!(str == &~"new", "/posts/new matched")
+    StringHandler(ref str) => assert!(str == &~"new", "/posts/new didn't match")
   }
 }

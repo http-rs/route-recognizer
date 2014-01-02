@@ -25,8 +25,14 @@ impl Router {
     let nfa = &mut self.nfa;
     let mut state = 0;
 
-    for char in route.chars() {
-      state = nfa.put(state, CharacterClass::valid_char(char));
+    for (i, segment) in route.split('/').enumerate() {
+      if i > 0 { state = nfa.put(state, CharacterClass::valid_char('/')); }
+
+      if segment.char_at(0) == ':' {
+        state = process_dynamic_segment(nfa, state);
+      } else {
+        state = process_static_segment(segment, nfa, state);
+      }
     }
 
     nfa.acceptance(state);
@@ -47,6 +53,21 @@ impl Router {
   }
 }
 
+fn process_static_segment(segment: &str, nfa: &mut NFA, mut state: uint) -> uint {
+  for char in segment.chars() {
+    state = nfa.put(state, CharacterClass::valid_char(char));
+  }
+
+  state
+}
+
+fn process_dynamic_segment(nfa: &mut NFA, mut state: uint) -> uint {
+  state = nfa.put(state, CharacterClass::invalid_char('/'));
+  nfa.put_state(state, state);
+
+  state
+}
+
 #[test]
 fn basic_router() {
   let mut router = Router::new();
@@ -57,5 +78,17 @@ fn basic_router() {
 
   match *router.recognize("/thomas").unwrap() {
     StringHandler(ref str) => assert!(str == &~"Thomas", "/thomas matched")
+  }
+}
+
+#[test]
+fn ambiguous_router() {
+  let mut router = Router::new();
+
+  router.add("/posts/new", StringHandler(~"new"));
+  router.add("/posts/:id", StringHandler(~"id"));
+
+  match *router.recognize("/posts/1").unwrap() {
+    StringHandler(ref str) => assert!(str == &~"id", "/posts/1 matched")
   }
 }

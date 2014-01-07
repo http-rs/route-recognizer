@@ -67,6 +67,17 @@ impl<T> State<T> {
   }
 }
 
+pub struct Match {
+  state: uint,
+  captures: ~[~str]
+}
+
+impl Match {
+  pub fn new(state: uint, captures: ~[~str]) -> Match {
+    Match{ state: state, captures: captures }
+  }
+}
+
 pub struct NFA<T> {
   states: ~[State<T>]
 }
@@ -77,7 +88,7 @@ impl<T> NFA<T> {
     NFA{ states: ~[root] }
   }
 
-  pub fn process<'a>(&'a self, string: &str, sort: |a: &[uint], b: &[uint]| -> Ordering) -> Result<&'a State<T>, ~str> {
+  pub fn process<'a>(&'a self, string: &str, sort: |a: &[uint], b: &[uint]| -> Ordering) -> Result<Match, ~str> {
     let mut current = ~[~[0]];
 
     for char in string.chars() {
@@ -98,8 +109,10 @@ impl<T> NFA<T> {
       Err(~"The string was exhausted before reaching an acceptance state")
     } else {
       returned.sort_by(|a,b| sort(*a, *b));
-      let trace = returned.last();
-      Ok(self.get(*trace.last()))
+      let trace = *returned.last();
+      let captures = self.extract_captures(string, trace);
+      let state = self.get(*trace.last());
+      Ok(Match::new(state.index, captures.map(|s| s.to_owned())))
     }
   }
 
@@ -122,22 +135,32 @@ impl<T> NFA<T> {
   fn extract_captures<'a>(&self, source: &'a str, trace: &[uint]) -> ~[&'a str] {
     let mut captures = ~[];
     let mut start_slice = None;
+    let end = trace.len() - 1;
 
-    for (pos, state_index) in trace.iter().enumerate() {
-      let state = self.get(*state_index);
+    for (pos, &state_index) in trace.iter().enumerate() {
+      let state = self.get(state_index);
 
-      if state.start_capture {
-        start_slice = Some(pos);
+      // If we haven't already started a capture, and this state is
+      // a capture start, remember this position
+      if start_slice.is_none() && state.start_capture {
+        start_slice = Some(pos-1);
       }
 
-      if state.end_capture {
-        captures.push(source.slice(start_slice.unwrap(), pos));
-        start_slice = None;
+      // If we haven't yet reached the end of the trace
+      if pos < end {
+        // Only end a capture if the current state is marked as
+        // a capture end *and* we're not re-entering the state
+        // next.
+        let next_state_index = trace[pos + 1];
+        if state_index != next_state_index && state.end_capture {
+          captures.push(source.slice(start_slice.unwrap(), pos));
+          start_slice = None;
+        }
+      } else if start_slice.is_some() && state.end_capture {
+        // If we reached the end of the trace, close any open
+        // trace if the final state is marked as a capture end.
+        captures.push(source.slice_from(start_slice.unwrap()));
       }
-    }
-
-    if start_slice.is_some() {
-      captures.push(source.slice_from(start_slice.unwrap()));
     }
 
     captures
@@ -212,9 +235,9 @@ fn basic_test() {
   let e = nfa.put(d, CharacterClass::valid("o"));
   nfa.acceptance(e);
 
-  let state = nfa.process("hello", |a,b| a.len().cmp(&b.len()));
+  let m = nfa.process("hello", |a,b| a.len().cmp(&b.len()));
 
-  assert!(state.unwrap() == nfa.get(e), "You didn't get the right final state");
+  assert!(m.unwrap().state == e, "You didn't get the right final state");
 }
 
 #[test]
@@ -230,9 +253,9 @@ fn multiple_solutions() {
   let c2 = nfa.put(b2, CharacterClass::invalid(""));
   nfa.acceptance(c2);
 
-  let state = nfa.process("new", |a,b| a.len().cmp(&b.len()));
+  let m = nfa.process("new", |a,b| a.len().cmp(&b.len()));
 
-  assert!(state.unwrap() == nfa.get(c2), "The two states were not found");
+  assert!(m.unwrap().state == c2, "The two states were not found");
 }
 
 #[test]
@@ -256,8 +279,8 @@ fn multiple_paths() {
   let thom = nfa.process("thom", |a,b| a.len().cmp(&b.len()));
   let nope = nfa.process("nope", |a,b| a.len().cmp(&b.len()));
 
-  assert!(thomas.unwrap() == nfa.get(f1), "thomas was parsed correctly");
-  assert!(tom.unwrap() == nfa.get(c2), "tom was parsed correctly");
+  assert!(thomas.unwrap().state == f1, "thomas was parsed correctly");
+  assert!(tom.unwrap().state == c2, "tom was parsed correctly");
   assert!(thom.is_err(), "thom didn't reach an acceptance state");
   assert!(nope.is_err(), "nope wasn't parsed");
 }
@@ -280,8 +303,8 @@ fn repetitions() {
   let new_post = nfa.process("posts/new", |a,b| a.len().cmp(&b.len()));
   let invalid = nfa.process("posts/", |a,b| a.len().cmp(&b.len()));
 
-  assert!(post.unwrap() == nfa.get(g), "posts/1 was parsed");
-  assert!(new_post.unwrap() == nfa.get(g), "posts/new was parsed");
+  assert!(post.unwrap().state == g, "posts/1 was parsed");
+  assert!(new_post.unwrap().state == g, "posts/new was parsed");
   assert!(invalid.is_err(), "posts/ was invalid");
 }
 
@@ -308,7 +331,50 @@ fn repetitions_with_ambiguous() {
   let ambiguous = nfa.process("posts/new", |a,b| a.len().cmp(&b.len()));
   let invalid = nfa.process("posts/", |a,b| a.len().cmp(&b.len()));
 
-  assert!(post.unwrap() == nfa.get(g1), "posts/1 was parsed");
-  assert!(ambiguous.unwrap() == nfa.get(i2), "posts/new was ambiguous");
+  assert!(post.unwrap().state == g1, "posts/1 was parsed");
+  assert!(ambiguous.unwrap().state == i2, "posts/new was ambiguous");
   assert!(invalid.is_err(), "posts/ was invalid");
+}
+
+#[test]
+fn captures() {
+  let mut nfa = NFA::<()>::new();
+  let a = nfa.put(0, CharacterClass::valid("n"));
+  let b = nfa.put(a, CharacterClass::valid("e"));
+  let c = nfa.put(b, CharacterClass::valid("w"));
+
+  nfa.acceptance(c);
+  nfa.start_capture(a);
+  nfa.end_capture(c);
+
+  let post = nfa.process("new", |a,b| a.len().cmp(&b.len()));
+
+  assert_eq!(post.unwrap().captures, ~[~"new"]);
+}
+
+#[test]
+fn capture_mid_match() {
+  let mut nfa = NFA::<()>::new();
+  let a = nfa.put(0, valid('p'));
+  let b = nfa.put(a, valid('/'));
+  let c = nfa.put(b, invalid('/'));
+  let d = nfa.put(c, valid('/'));
+  let e = nfa.put(d, valid('c'));
+
+  nfa.put_state(c, c);
+  nfa.acceptance(e);
+  nfa.start_capture(c);
+  nfa.end_capture(c);
+
+  let post = nfa.process("p/123/c", |a,b| a.len().cmp(&b.len()));
+
+  assert_eq!(post.unwrap().captures, ~[~"123"]);
+}
+
+fn valid(char: char) -> CharacterClass {
+  CharacterClass::valid_char(char)
+}
+
+fn invalid(char: char) -> CharacterClass {
+  CharacterClass::invalid_char(char)
 }

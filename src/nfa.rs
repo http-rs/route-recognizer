@@ -7,6 +7,10 @@ pub enum CharacterClass {
 }
 
 impl CharacterClass {
+  pub fn any() -> CharacterClass {
+    InvalidChars(HashSet::new())
+  }
+
   pub fn valid(string: &str) -> CharacterClass {
     ValidChars(CharacterClass::str_to_set(string))
   }
@@ -84,7 +88,7 @@ pub struct NFA<T> {
 
 impl<T> NFA<T> {
   pub fn new() -> NFA<T> {
-    let root = State::new(0, CharacterClass::valid(""));
+    let root = State::new(0, CharacterClass::any());
     NFA{ states: ~[root] }
   }
 
@@ -103,13 +107,13 @@ impl<T> NFA<T> {
 
     let mut returned = current.iter().filter(|trace| {
       self.get(*trace.last()).acceptance
-    }).map(|trace| (*trace).as_slice()).to_owned_vec();
+    }).map(|trace| trace.as_slice()).to_owned_vec();
 
     if returned.is_empty() {
       Err(~"The string was exhausted before reaching an acceptance state")
     } else {
-      returned.sort_by(|a,b| sort(*a, *b));
-      let trace = *returned.last();
+      returned.sort_by(|&a,&b| sort(a, b));
+      let &trace = returned.last();
       let captures = self.extract_captures(string, trace);
       let state = self.get(*trace.last());
       Ok(Match::new(state.index, captures.map(|s| s.to_owned())))
@@ -121,8 +125,8 @@ impl<T> NFA<T> {
 
     for trace in traces.iter() {
       let state = self.get(*trace.last());
-      for index in state.next_states.iter() {
-        let state = self.get(*index);
+      for &index in state.next_states.iter() {
+        let state = self.get(index);
         if state.chars.matches(char) {
           returned.push(fork_trace(trace, state));
         }
@@ -178,10 +182,10 @@ impl<T> NFA<T> {
     {
       let state = self.get(index);
 
-      for index in state.next_states.iter() {
-        let state = self.get(*index);
+      for &index in state.next_states.iter() {
+        let state = self.get(index);
         if state.chars == chars {
-          return *index;
+          return index;
         }
       }
     }
@@ -369,6 +373,31 @@ fn capture_mid_match() {
   let post = nfa.process("p/123/c", |a,b| a.len().cmp(&b.len()));
 
   assert_eq!(post.unwrap().captures, ~[~"123"]);
+}
+
+#[test]
+fn capture_multiple_captures() {
+  let mut nfa = NFA::<()>::new();
+  let a = nfa.put(0, valid('p'));
+  let b = nfa.put(a, valid('/'));
+  let c = nfa.put(b, invalid('/'));
+  let d = nfa.put(c, valid('/'));
+  let e = nfa.put(d, valid('c'));
+  let f = nfa.put(e, valid('/'));
+  let g = nfa.put(f, invalid('/'));
+
+  nfa.put_state(c, c);
+  nfa.put_state(g, g);
+  nfa.acceptance(g);
+
+  nfa.start_capture(c);
+  nfa.end_capture(c);
+
+  nfa.start_capture(g);
+  nfa.end_capture(g);
+
+  let post = nfa.process("p/123/c/456", |a,b| a.len().cmp(&b.len()));
+  assert_eq!(post.unwrap().captures, ~[~"123", ~"456"]);
 }
 
 fn valid(char: char) -> CharacterClass {

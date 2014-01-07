@@ -69,19 +69,20 @@ impl<T> NFA<T> {
   }
 
   pub fn process<'a>(&'a self, string: &str) -> Result<~[&'a State<T>], ~str> {
-    let mut current = ~[self.get(0)];
+    let mut current = ~[~[0]];
 
     for char in string.chars() {
-      let next_states = self.process_char(current, &char);
+      let next_traces = self.process_char(current, &char);
 
-      if next_states.is_empty() {
+      if next_traces.is_empty() {
         return Err("Couldn't process " + string);
       }
 
-      current = next_states;
+      current = next_traces;
     }
 
-    let returned = current.iter().filter_map(|&state| {
+    let returned = current.iter().filter_map(|trace| {
+      let state = self.get(*trace.last());
       if state.acceptance { Some(state) } else { None }
     }).to_owned_vec();
 
@@ -92,15 +93,24 @@ impl<T> NFA<T> {
     }
   }
 
-  fn process_char<'a>(&'a self, states: ~[&State<T>], char: &char) -> ~[&'a State<T>] {
+  fn process_char<'a>(&'a self, traces: ~[~[uint]], char: &char) -> ~[~[uint]] {
     let mut returned = ~[];
 
-    for state in states.iter() {
+    for trace in traces.iter() {
+      let state = self.get(*trace.last());
       for index in state.next_states.iter() {
         let state = self.get(*index);
         match state.chars {
-          ValidChars(ref valid) => if valid.contains(&~*char) { returned.push(state); },
-          InvalidChars(ref invalid) => if !invalid.contains(&~*char) { returned.push(state); }
+          ValidChars(ref valid) => if valid.contains(&~*char) {
+            let mut new_trace = trace.clone();
+            new_trace.push(state.index);
+            returned.push(new_trace);
+          },
+          InvalidChars(ref invalid) => if !invalid.contains(&~*char) {
+            let mut new_trace = trace.clone();
+            new_trace.push(state.index);
+            returned.push(new_trace);
+          }
         }
       }
     }

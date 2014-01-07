@@ -86,7 +86,8 @@ impl<T> Router<T> {
       path = path.slice_from(1);
     }
 
-    let states = self.nfa.process(path);
+    let nfa = &self.nfa;
+    let states = nfa.process(path, |a,b| nfa.get(*a.last()).metadata.get_ref().cmp(nfa.get(*b.last()).metadata.get_ref()));
 
     match states {
       Err(str) => Err(str),

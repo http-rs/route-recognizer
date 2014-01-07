@@ -68,7 +68,7 @@ impl<T> NFA<T> {
     NFA{ states: ~[root] }
   }
 
-  pub fn process<'a>(&'a self, string: &str) -> Result<~[&'a State<T>], ~str> {
+  pub fn process<'a>(&'a self, string: &str, sort: |a: &[uint], b: &[uint]| -> Ordering) -> Result<~[&'a State<T>], ~str> {
     let mut current = ~[~[0]];
 
     for char in string.chars() {
@@ -173,7 +173,7 @@ fn basic_test() {
   let e = nfa.put(d, CharacterClass::valid("o"));
   nfa.acceptance(e);
 
-  let states = nfa.process("hello");
+  let states = nfa.process("hello", |a,b| a.len().cmp(&b.len()));
 
   assert!(states.unwrap() == ~[nfa.get(e)], "You didn't get the right final state");
 }
@@ -191,7 +191,7 @@ fn multiple_solutions() {
   let c2 = nfa.put(b2, CharacterClass::invalid(""));
   nfa.acceptance(c2);
 
-  let states = nfa.process("new");
+  let states = nfa.process("new", |a,b| a.len().cmp(&b.len()));
 
   assert!(states.unwrap() == ~[nfa.get(c1), nfa.get(c2)], "The two states were not found");
 }
@@ -212,10 +212,10 @@ fn multiple_paths() {
   nfa.acceptance(f1);
   nfa.acceptance(c2);
 
-  let thomas = nfa.process("thomas");
-  let tom = nfa.process("tom");
-  let thom = nfa.process("thom");
-  let nope = nfa.process("nope");
+  let thomas = nfa.process("thomas", |a,b| a.len().cmp(&b.len()));
+  let tom = nfa.process("tom", |a,b| a.len().cmp(&b.len()));
+  let thom = nfa.process("thom", |a,b| a.len().cmp(&b.len()));
+  let nope = nfa.process("nope", |a,b| a.len().cmp(&b.len()));
 
   assert!(thomas.unwrap() == ~[nfa.get(f1)], "thomas was parsed correctly");
   assert!(tom.unwrap() == ~[nfa.get(c2)], "tom was parsed correctly");
@@ -237,9 +237,9 @@ fn repetitions() {
 
   nfa.acceptance(g);
 
-  let post = nfa.process("posts/1");
-  let new_post = nfa.process("posts/new");
-  let invalid = nfa.process("posts/");
+  let post = nfa.process("posts/1", |a,b| a.len().cmp(&b.len()));
+  let new_post = nfa.process("posts/new", |a,b| a.len().cmp(&b.len()));
+  let invalid = nfa.process("posts/", |a,b| a.len().cmp(&b.len()));
 
   assert!(post.unwrap() == ~[nfa.get(g)], "posts/1 was parsed");
   assert!(new_post.unwrap() == ~[nfa.get(g)], "posts/new was parsed");
@@ -265,9 +265,9 @@ fn repetitions_with_ambiguous() {
   nfa.acceptance(g1);
   nfa.acceptance(i2);
 
-  let post = nfa.process("posts/1");
-  let ambiguous = nfa.process("posts/new");
-  let invalid = nfa.process("posts/");
+  let post = nfa.process("posts/1", |a,b| a.len().cmp(&b.len()));
+  let ambiguous = nfa.process("posts/new", |a,b| a.len().cmp(&b.len()));
+  let invalid = nfa.process("posts/", |a,b| a.len().cmp(&b.len()));
 
   assert!(post.unwrap() == ~[nfa.get(g1)], "posts/1 was parsed");
   assert!(ambiguous.unwrap() == ~[nfa.get(g1), nfa.get(i2)], "posts/new was ambiguous");

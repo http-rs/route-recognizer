@@ -68,7 +68,7 @@ impl<T> NFA<T> {
     NFA{ states: ~[root] }
   }
 
-  pub fn process<'a>(&'a self, string: &str, sort: |a: &[uint], b: &[uint]| -> Ordering) -> Result<~[&'a State<T>], ~str> {
+  pub fn process<'a>(&'a self, string: &str, sort: |a: &[uint], b: &[uint]| -> Ordering) -> Result<&'a State<T>, ~str> {
     let mut current = ~[~[0]];
 
     for char in string.chars() {
@@ -81,15 +81,15 @@ impl<T> NFA<T> {
       current = next_traces;
     }
 
-    let returned = current.iter().filter_map(|trace| {
-      let state = self.get(*trace.last());
-      if state.acceptance { Some(state) } else { None }
-    }).to_owned_vec();
+    let mut returned = current.iter().filter(|trace| {
+      self.get(*trace.last()).acceptance
+    }).map(|trace| (*trace).as_slice()).to_owned_vec();
 
     if returned.is_empty() {
       Err(~"The string was exhausted before reaching an acceptance state")
     } else {
-      Ok(returned)
+      returned.sort_by(|a,b| sort(*a, *b));
+      Ok(self.get(*returned.last().last()))
     }
   }
 
@@ -175,7 +175,7 @@ fn basic_test() {
 
   let states = nfa.process("hello", |a,b| a.len().cmp(&b.len()));
 
-  assert!(states.unwrap() == ~[nfa.get(e)], "You didn't get the right final state");
+  assert!(states.unwrap() == nfa.get(e), "You didn't get the right final state");
 }
 
 #[test]
@@ -193,7 +193,7 @@ fn multiple_solutions() {
 
   let states = nfa.process("new", |a,b| a.len().cmp(&b.len()));
 
-  assert!(states.unwrap() == ~[nfa.get(c1), nfa.get(c2)], "The two states were not found");
+  assert!(states.unwrap() == nfa.get(c2), "The two states were not found");
 }
 
 #[test]
@@ -217,8 +217,8 @@ fn multiple_paths() {
   let thom = nfa.process("thom", |a,b| a.len().cmp(&b.len()));
   let nope = nfa.process("nope", |a,b| a.len().cmp(&b.len()));
 
-  assert!(thomas.unwrap() == ~[nfa.get(f1)], "thomas was parsed correctly");
-  assert!(tom.unwrap() == ~[nfa.get(c2)], "tom was parsed correctly");
+  assert!(thomas.unwrap() == nfa.get(f1), "thomas was parsed correctly");
+  assert!(tom.unwrap() == nfa.get(c2), "tom was parsed correctly");
   assert!(thom.is_err(), "thom didn't reach an acceptance state");
   assert!(nope.is_err(), "nope wasn't parsed");
 }
@@ -241,8 +241,8 @@ fn repetitions() {
   let new_post = nfa.process("posts/new", |a,b| a.len().cmp(&b.len()));
   let invalid = nfa.process("posts/", |a,b| a.len().cmp(&b.len()));
 
-  assert!(post.unwrap() == ~[nfa.get(g)], "posts/1 was parsed");
-  assert!(new_post.unwrap() == ~[nfa.get(g)], "posts/new was parsed");
+  assert!(post.unwrap() == nfa.get(g), "posts/1 was parsed");
+  assert!(new_post.unwrap() == nfa.get(g), "posts/new was parsed");
   assert!(invalid.is_err(), "posts/ was invalid");
 }
 
@@ -269,7 +269,7 @@ fn repetitions_with_ambiguous() {
   let ambiguous = nfa.process("posts/new", |a,b| a.len().cmp(&b.len()));
   let invalid = nfa.process("posts/", |a,b| a.len().cmp(&b.len()));
 
-  assert!(post.unwrap() == ~[nfa.get(g1)], "posts/1 was parsed");
-  assert!(ambiguous.unwrap() == ~[nfa.get(g1), nfa.get(i2)], "posts/new was ambiguous");
+  assert!(post.unwrap() == nfa.get(g1), "posts/1 was parsed");
+  assert!(ambiguous.unwrap() == nfa.get(i2), "posts/new was ambiguous");
   assert!(invalid.is_err(), "posts/ was invalid");
 }

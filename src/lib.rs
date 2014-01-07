@@ -87,14 +87,11 @@ impl<T> Router<T> {
     }
 
     let nfa = &self.nfa;
-    let states = nfa.process(path, |a,b| nfa.get(*a.last()).metadata.get_ref().cmp(nfa.get(*b.last()).metadata.get_ref()));
+    let result = nfa.process(path, |a,b| nfa.get(*a.last()).metadata.get_ref().cmp(nfa.get(*b.last()).metadata.get_ref()));
 
-    match states {
-      Err(str) => Err(str),
-      Ok(mut states) => {
-        states.sort_by(|a, b| a.metadata.get_ref().cmp(b.metadata.get_ref()));
-        Ok(self.handlers.get(&states.last().index))
-      }
+    match result {
+      Ok(state) => Ok(self.handlers.get(&state.index)),
+      Err(str) => Err(str)
     }
   }
 }

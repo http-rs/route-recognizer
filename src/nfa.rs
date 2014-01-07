@@ -2,8 +2,8 @@ use std::hashmap::HashSet;
 
 #[deriving(Eq)]
 pub enum CharacterClass {
-  ValidChars(HashSet<~char>),
-  InvalidChars(HashSet<~char>)
+  ValidChars(HashSet<char>),
+  InvalidChars(HashSet<char>)
 }
 
 impl CharacterClass {
@@ -23,16 +23,23 @@ impl CharacterClass {
     InvalidChars(CharacterClass::char_to_set(char))
   }
 
-  fn char_to_set(char: char) -> HashSet<~char> {
+  pub fn matches(&self, char: &char) -> bool {
+    match *self {
+      ValidChars(ref valid) => valid.contains(char),
+      InvalidChars(ref invalid) => !invalid.contains(char)
+    }
+  }
+
+  fn char_to_set(char: char) -> HashSet<char> {
     let mut set = HashSet::new();
-    set.insert(~char);
+    set.insert(char);
     set
   }
 
-  fn str_to_set(string: &str) -> HashSet<~char> {
+  fn str_to_set(string: &str) -> HashSet<char> {
     let mut set = HashSet::new();
     for char in string.chars() {
-      set.insert(~char);
+      set.insert(char);
     }
     set
   }
@@ -43,6 +50,8 @@ struct State<T> {
   chars: CharacterClass,
   next_states: ~[uint],
   acceptance: bool,
+  start_capture: bool,
+  end_capture: bool,
   metadata: Option<T>
 }
 
@@ -54,7 +63,7 @@ impl<T> Eq for State<T> {
 
 impl<T> State<T> {
   pub fn new(index: uint, chars: CharacterClass) -> State<T> {
-    State{ index: index, chars: chars, next_states: ~[], acceptance: false, metadata: None }
+    State{ index: index, chars: chars, next_states: ~[], acceptance: false, start_capture: false, end_capture: false, metadata: None }
   }
 }
 
@@ -89,7 +98,8 @@ impl<T> NFA<T> {
       Err(~"The string was exhausted before reaching an acceptance state")
     } else {
       returned.sort_by(|a,b| sort(*a, *b));
-      Ok(self.get(*returned.last().last()))
+      let trace = returned.last();
+      Ok(self.get(*trace.last()))
     }
   }
 
@@ -100,22 +110,37 @@ impl<T> NFA<T> {
       let state = self.get(*trace.last());
       for index in state.next_states.iter() {
         let state = self.get(*index);
-        match state.chars {
-          ValidChars(ref valid) => if valid.contains(&~*char) {
-            let mut new_trace = trace.clone();
-            new_trace.push(state.index);
-            returned.push(new_trace);
-          },
-          InvalidChars(ref invalid) => if !invalid.contains(&~*char) {
-            let mut new_trace = trace.clone();
-            new_trace.push(state.index);
-            returned.push(new_trace);
-          }
+        if state.chars.matches(char) {
+          returned.push(fork_trace(trace, state));
         }
       }
     }
 
     returned
+  }
+
+  fn extract_captures<'a>(&self, source: &'a str, trace: &[uint]) -> ~[&'a str] {
+    let mut captures = ~[];
+    let mut start_slice = None;
+
+    for (pos, state_index) in trace.iter().enumerate() {
+      let state = self.get(*state_index);
+
+      if state.start_capture {
+        start_slice = Some(pos);
+      }
+
+      if state.end_capture {
+        captures.push(source.slice(start_slice.unwrap(), pos));
+        start_slice = None;
+      }
+    }
+
+    if start_slice.is_some() {
+      captures.push(source.slice_from(start_slice.unwrap()));
+    }
+
+    captures
   }
 
   pub fn get<'a>(&'a self, state: uint) -> &'a State<T> {
@@ -151,6 +176,14 @@ impl<T> NFA<T> {
     self.get_mut(index).acceptance = true;
   }
 
+  pub fn start_capture(&mut self, index: uint) {
+    self.get_mut(index).start_capture = true;
+  }
+
+  pub fn end_capture(&mut self, index: uint) {
+    self.get_mut(index).end_capture = true;
+  }
+
   pub fn metadata(&mut self, index: uint, metadata: T) {
     self.get_mut(index).metadata = Some(metadata);
   }
@@ -163,6 +196,12 @@ impl<T> NFA<T> {
   }
 }
 
+fn fork_trace<T>(trace: &~[uint], state: &State<T>) -> ~[uint] {
+  let mut new_trace = trace.clone();
+  new_trace.push(state.index);
+  new_trace
+}
+
 #[test]
 fn basic_test() {
   let mut nfa = NFA::<()>::new();
@@ -173,9 +212,9 @@ fn basic_test() {
   let e = nfa.put(d, CharacterClass::valid("o"));
   nfa.acceptance(e);
 
-  let states = nfa.process("hello", |a,b| a.len().cmp(&b.len()));
+  let state = nfa.process("hello", |a,b| a.len().cmp(&b.len()));
 
-  assert!(states.unwrap() == nfa.get(e), "You didn't get the right final state");
+  assert!(state.unwrap() == nfa.get(e), "You didn't get the right final state");
 }
 
 #[test]
@@ -191,9 +230,9 @@ fn multiple_solutions() {
   let c2 = nfa.put(b2, CharacterClass::invalid(""));
   nfa.acceptance(c2);
 
-  let states = nfa.process("new", |a,b| a.len().cmp(&b.len()));
+  let state = nfa.process("new", |a,b| a.len().cmp(&b.len()));
 
-  assert!(states.unwrap() == nfa.get(c2), "The two states were not found");
+  assert!(state.unwrap() == nfa.get(c2), "The two states were not found");
 }
 
 #[test]

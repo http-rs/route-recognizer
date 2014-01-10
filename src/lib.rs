@@ -1,7 +1,10 @@
+#[crate_id = "route_recognizer#0.1.0"];
+
+extern mod extra;
 use nfa::NFA;
 use nfa::CharacterClass;
-use std::hashmap::HashMap;
-mod nfa;
+use extra::treemap::TreeMap;
+pub mod nfa;
 
 #[deriving(Clone)]
 struct Metadata {
@@ -43,25 +46,47 @@ impl TotalEq for Metadata {
   }
 }
 
+#[deriving(Eq, Clone)]
+pub struct Params {
+  map: TreeMap<~str, ~str>
+}
+
+impl Params {
+  pub fn new() -> Params {
+    Params{ map: TreeMap::new() }
+  }
+
+  pub fn insert(&mut self, key: ~str, value: ~str) {
+    self.map.insert(key, value);
+  }
+}
+
+impl Index<&'static str, Option<~str>> for Params {
+  fn index(&self, index: & &'static str) -> Option<~str> {
+    self.map.find(&index.to_owned()).map(|opt| opt.clone())
+  }
+}
+
 pub struct Match<T> {
   handler: T,
-  params: HashMap<~str, ~str>
+  params: Params
 }
 
 impl<T> Match<T> {
-  pub fn new(handler: T, params: HashMap<~str, ~str>) -> Match<T> {
+  pub fn new(handler: T, params: Params) -> Match<T> {
     Match{ handler: handler, params: params }
   }
 }
 
+#[deriving(Clone)]
 pub struct Router<T> {
   nfa: NFA<Metadata>,
-  handlers: HashMap<uint, T>
+  handlers: TreeMap<uint, T>
 }
 
 impl<T> Router<T> {
   pub fn new() -> Router<T> {
-    Router{ nfa: NFA::new(), handlers: HashMap::new() }
+    Router{ nfa: NFA::new(), handlers: TreeMap::new() }
   }
 
   pub fn add(&mut self, mut route: &str, dest: T) {
@@ -101,7 +126,7 @@ impl<T> Router<T> {
 
     match result {
       Ok(nfa_match) => {
-        let mut map = HashMap::new();
+        let mut map = Params::new();
         let state = &nfa.get(nfa_match.state);
         let metadata = state.metadata.get_ref();
         let param_names = metadata.param_names.clone();
@@ -110,7 +135,7 @@ impl<T> Router<T> {
           map.insert(param_names[i].to_owned(), capture.to_owned());
         }
 
-        let handler = self.handlers.get(&nfa_match.state);
+        let handler = self.handlers.find(&nfa_match.state).unwrap();
         Ok(Match::new(handler, map))
       },
       Err(str) => Err(str)
@@ -146,7 +171,7 @@ fn basic_router() {
   let m = router.recognize("/thomas").unwrap();
 
   assert_eq!(*m.handler, ~"Thomas");
-  assert_eq!(m.params, HashMap::new());
+  assert_eq!(m.params, Params::new());
 }
 
 #[test]
@@ -163,7 +188,7 @@ fn ambiguous_router() {
 
   let new = router.recognize("/posts/new").unwrap();
   assert_eq!(*new.handler, ~"new");
-  assert_eq!(new.params, HashMap::new());
+  assert_eq!(new.params, Params::new());
 }
 
 
@@ -181,7 +206,7 @@ fn ambiguous_router_b() {
 
   let new = router.recognize("/posts/new").unwrap();
   assert_eq!(*new.handler, ~"new");
-  assert_eq!(new.params, HashMap::new());
+  assert_eq!(new.params, Params::new());
 }
 
 
@@ -200,16 +225,34 @@ fn multiple_params() {
 
   assert_eq!(*coms.handler, ~"comments");
   assert_eq!(coms.params, params("post_id", "12"));
+  assert_eq!(coms.params["post_id"], Some(~"12"));
 }
 
-fn params(key: &str, val: &str) -> HashMap<~str, ~str> {
-  let mut map = HashMap::new();
+#[bench]
+fn benchmark(b: &mut extra::test::BenchHarness) {
+  let mut router = Router::new();
+  router.add("/posts/:post_id/comments/:id", ~"comment");
+  router.add("/posts/:post_id/comments", ~"comments");
+  router.add("/posts/:post_id", ~"post");
+  router.add("/posts", ~"posts");
+  router.add("/comments", ~"comments2");
+  router.add("/comments/:id", ~"comment2");
+
+  b.iter(|| {
+    router.recognize("/posts/100/comments/200");
+  });
+}
+
+#[allow(dead_code)]
+fn params(key: &str, val: &str) -> Params {
+  let mut map = Params::new();
   map.insert(key.to_owned(), val.to_owned());
   map
 }
 
-fn two_params(k1: &str, v1: &str, k2: &str, v2: &str) -> HashMap<~str, ~str> {
-  let mut map = HashMap::new();
+#[allow(dead_code)]
+fn two_params(k1: &str, v1: &str, k2: &str, v2: &str) -> Params {
+  let mut map = Params::new();
   map.insert(k1.to_owned(), v1.to_owned());
   map.insert(k2.to_owned(), v2.to_owned());
   map

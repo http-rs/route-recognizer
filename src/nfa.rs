@@ -1,6 +1,6 @@
 use std::hashmap::HashSet;
 
-#[deriving(Eq)]
+#[deriving(Eq, Clone)]
 pub enum CharacterClass {
   ValidChars(HashSet<char>),
   InvalidChars(HashSet<char>)
@@ -49,6 +49,7 @@ impl CharacterClass {
   }
 }
 
+#[deriving(Clone)]
 struct State<T> {
   index: uint,
   chars: CharacterClass,
@@ -82,6 +83,7 @@ impl Match {
   }
 }
 
+#[deriving(Clone)]
 pub struct NFA<T> {
   states: ~[State<T>]
 }
@@ -400,10 +402,12 @@ fn capture_multiple_captures() {
   assert_eq!(post.unwrap().captures, ~[~"123", ~"456"]);
 }
 
+#[allow(dead_code)]
 fn valid(char: char) -> CharacterClass {
   CharacterClass::valid_char(char)
 }
 
+#[allow(dead_code)]
 fn invalid(char: char) -> CharacterClass {
   CharacterClass::invalid_char(char)
 }

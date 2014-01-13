@@ -61,9 +61,12 @@ impl Params {
   }
 }
 
-impl Index<&'static str, Option<~str>> for Params {
-  fn index(&self, index: & &'static str) -> Option<~str> {
-    self.map.find(&index.to_owned()).map(|opt| opt.clone())
+impl<'a> Index<&'static str, ~str> for Params {
+  fn index(&self, index: & &'static str) -> ~str {
+    match self.map.find(&index.to_owned()) {
+      None => fail!("params[" + *index + "] did not exist"),
+      Some(s) => s.to_owned()
+    }
   }
 }
 
@@ -225,7 +228,7 @@ fn multiple_params() {
 
   assert_eq!(*coms.handler, ~"comments");
   assert_eq!(coms.params, params("post_id", "12"));
-  assert_eq!(coms.params["post_id"], Some(~"12"));
+  assert_eq!(coms.params["post_id"], ~"12");
 }
 
 #[bench]

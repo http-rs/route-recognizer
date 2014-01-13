@@ -168,12 +168,30 @@ impl<T> NFA<T> {
   fn process_char<'a>(&'a self, traces: ~[~[uint]], char: char) -> ~[~[uint]] {
     let mut returned = ~[];
 
-    for trace in traces.iter() {
+    for mut trace in traces.move_iter() {
       let state = self.get(*trace.last());
+
+      let mut count = 0;
+      let mut found_state = None;
+
       for &index in state.next_states.iter() {
         let state = self.get(index);
         if state.chars.matches(char) {
-          returned.push(fork_trace(trace, state));
+          count += 1;
+          found_state = Some(state);
+        }
+      }
+
+      if count == 1 {
+        trace.push(found_state.unwrap().index);
+        returned.push(trace);
+        continue;
+      }
+
+      for &index in state.next_states.iter() {
+        let state = self.get(index);
+        if state.chars.matches(char) {
+          returned.push(fork_trace(&trace, state));
         }
       }
     }

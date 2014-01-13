@@ -125,7 +125,7 @@ impl<T> Router<T> {
     }
 
     let nfa = &self.nfa;
-    let result = nfa.process(path, |a,b| nfa.get(*a.last()).metadata.get_ref().cmp(nfa.get(*b.last()).metadata.get_ref()));
+    let result = nfa.process(path, |a,b| nfa.get(a).metadata.get_ref().cmp(nfa.get(b).metadata.get_ref()));
 
     match result {
       Ok(nfa_match) => {

@@ -93,6 +93,39 @@ impl CharacterClass {
 }
 
 #[deriving(Clone)]
+struct Thread {
+  state: uint,
+  source: ~str,
+  captures: ~[(uint, uint)],
+  capture_begin: Option<uint>
+}
+
+impl Thread {
+  pub fn new(source: &str) -> Thread {
+    Thread{ state: 0, captures: ~[], capture_begin: None, source: source.to_owned() }
+  }
+
+  pub fn start_capture(&mut self, start: uint) {
+    self.capture_begin = Some(start);
+  }
+
+  pub fn end_capture(&mut self, end: uint) {
+    self.captures.push((self.capture_begin.unwrap(), end));
+    self.capture_begin = None;
+  }
+
+  pub fn extract<'a>(&self, source: &'a str) -> ~[&'a str] {
+    let mut ret = ~[];
+
+    for &(begin, end) in self.captures.iter() {
+      ret.push(source.slice(begin, end))
+    }
+
+    ret
+  }
+}
+
+#[deriving(Clone)]
 struct State<T> {
   index: uint,
   chars: CharacterClass,
@@ -115,13 +148,13 @@ impl<T> State<T> {
   }
 }
 
-pub struct Match {
+pub struct Match<'a> {
   state: uint,
-  captures: ~[~str]
+  captures: ~[&'a str]
 }
 
-impl Match {
-  pub fn new(state: uint, captures: ~[~str]) -> Match {
+impl<'a> Match<'a> {
+  pub fn new<'a>(state: uint, captures: ~[&'a str]) -> Match<'a> {
     Match{ state: state, captures: captures }
   }
 }
@@ -137,45 +170,47 @@ impl<T> NFA<T> {
     NFA{ states: ~[root] }
   }
 
-  pub fn process<'a>(&'a self, string: &str, sort: |a: &[uint], b: &[uint]| -> Ordering) -> Result<Match, ~str> {
-    let mut current = ~[~[0]];
+  pub fn process<'a>(&self, string: &'a str, sort: |a: uint, b: uint| -> Ordering) -> Result<Match<'a>, ~str> {
+    let mut threads = ~[Thread::new(string)];
 
-    for char in string.chars() {
-      let next_traces = self.process_char(current, char);
+    for (i, char) in string.chars().enumerate() {
+      let next_threads = self.process_char(threads, char, i);
 
-      if next_traces.is_empty() {
-        return Err("Couldn't process " + string);
+      if next_threads.is_empty() {
+        return Err("CoulDn't process " + string);
       }
 
-      current = next_traces;
+      threads = next_threads;
     }
 
-    let mut returned = current.iter().filter(|trace| {
-      self.get(*trace.last()).acceptance
-    }).map(|trace| trace.as_slice()).to_owned_vec();
+    let mut returned = threads.move_iter().filter(|thread| {
+      self.get(thread.state).acceptance
+    }).to_owned_vec();
 
     if returned.is_empty() {
       Err(~"The string was exhausted before reaching an acceptance state")
     } else {
-      returned.sort_by(|&a,&b| sort(a, b));
-      let &trace = returned.last();
-      let captures = self.extract_captures(string, trace);
-      let state = self.get(*trace.last());
-      Ok(Match::new(state.index, captures.map(|s| s.to_owned())))
+      returned.sort_by(|a,b| sort(a.state, b.state));
+      let thread = &mut returned[returned.len() - 1];
+      if thread.capture_begin.is_some() { thread.end_capture(string.len()); }
+
+      let state = self.get(thread.state);
+      Ok(Match::new(state.index, thread.extract(string)))
     }
   }
 
-  fn process_char<'a>(&'a self, traces: ~[~[uint]], char: char) -> ~[~[uint]] {
+  fn process_char<'a>(&self, threads: ~[Thread], char: char, pos: uint) -> ~[Thread] {
     let mut returned = ~[];
 
-    for mut trace in traces.move_iter() {
-      let state = self.get(*trace.last());
+    for mut thread in threads.move_iter() {
+      let current_state = self.get(thread.state);
 
       let mut count = 0;
       let mut found_state = None;
 
-      for &index in state.next_states.iter() {
+      for &index in current_state.next_states.iter() {
         let state = self.get(index);
+
         if state.chars.matches(char) {
           count += 1;
           found_state = Some(state);
@@ -183,54 +218,33 @@ impl<T> NFA<T> {
       }
 
       if count == 1 {
-        trace.push(found_state.unwrap().index);
-        returned.push(trace);
+        thread.state = found_state.unwrap().index;
+        capture(&mut thread, current_state, found_state.unwrap(), pos);
+        returned.push(thread);
         continue;
       }
 
-      for &index in state.next_states.iter() {
+      for &index in current_state.next_states.iter() {
         let state = self.get(index);
         if state.chars.matches(char) {
-          returned.push(fork_trace(&trace, state));
+          let mut thread = fork_thread(&thread, state);
+          capture(&mut thread, current_state, state, pos);
+          returned.push(thread);
+        }
+      }
+
+      fn capture<T>(thread: &mut Thread, current_state: &State<T>, next_state: &State<T>, pos: uint) {
+        if thread.capture_begin.is_none() && next_state.start_capture {
+          thread.start_capture(pos);
+        }
+
+        if thread.capture_begin.is_some() && current_state.end_capture && next_state.index > current_state.index {
+          thread.end_capture(pos);
         }
       }
     }
 
     returned
-  }
-
-  fn extract_captures<'a>(&self, source: &'a str, trace: &[uint]) -> ~[&'a str] {
-    let mut captures = ~[];
-    let mut start_slice = None;
-    let end = trace.len() - 1;
-
-    for (pos, &state_index) in trace.iter().enumerate() {
-      let state = self.get(state_index);
-
-      // If we haven't already started a capture, and this state is
-      // a capture start, remember this position
-      if start_slice.is_none() && state.start_capture {
-        start_slice = Some(pos-1);
-      }
-
-      // If we haven't yet reached the end of the trace
-      if pos < end {
-        // Only end a capture if the current state is marked as
-        // a capture end *and* we're not re-entering the state
-        // next.
-        let next_state_index = trace[pos + 1];
-        if state_index != next_state_index && state.end_capture {
-          captures.push(source.slice(start_slice.unwrap(), pos));
-          start_slice = None;
-        }
-      } else if start_slice.is_some() && state.end_capture {
-        // If we reached the end of the trace, close any open
-        // trace if the final state is marked as a capture end.
-        captures.push(source.slice_from(start_slice.unwrap()));
-      }
-    }
-
-    captures
   }
 
   pub fn get<'a>(&'a self, state: uint) -> &'a State<T> {
@@ -286,9 +300,9 @@ impl<T> NFA<T> {
   }
 }
 
-fn fork_trace<T>(trace: &~[uint], state: &State<T>) -> ~[uint] {
-  let mut new_trace = trace.clone();
-  new_trace.push(state.index);
+fn fork_thread<T>(thread: &Thread, state: &State<T>) -> Thread {
+  let mut new_trace = thread.clone();
+  new_trace.state = state.index;
   new_trace
 }
 
@@ -302,7 +316,7 @@ fn basic_test() {
   let e = nfa.put(d, CharacterClass::valid("o"));
   nfa.acceptance(e);
 
-  let m = nfa.process("hello", |a,b| a.len().cmp(&b.len()));
+  let m = nfa.process("hello", |a,b| a.cmp(&b));
 
   assert!(m.unwrap().state == e, "You didn't get the right final state");
 }
@@ -320,7 +334,7 @@ fn multiple_solutions() {
   let c2 = nfa.put(b2, CharacterClass::invalid(""));
   nfa.acceptance(c2);
 
-  let m = nfa.process("new", |a,b| a.len().cmp(&b.len()));
+  let m = nfa.process("new", |a,b| a.cmp(&b));
 
   assert!(m.unwrap().state == c2, "The two states were not found");
 }
@@ -341,10 +355,10 @@ fn multiple_paths() {
   nfa.acceptance(f1);
   nfa.acceptance(c2);
 
-  let thomas = nfa.process("thomas", |a,b| a.len().cmp(&b.len()));
-  let tom = nfa.process("tom", |a,b| a.len().cmp(&b.len()));
-  let thom = nfa.process("thom", |a,b| a.len().cmp(&b.len()));
-  let nope = nfa.process("nope", |a,b| a.len().cmp(&b.len()));
+  let thomas = nfa.process("thomas", |a,b| a.cmp(&b));
+  let tom = nfa.process("tom", |a,b| a.cmp(&b));
+  let thom = nfa.process("thom", |a,b| a.cmp(&b));
+  let nope = nfa.process("nope", |a,b| a.cmp(&b));
 
   assert!(thomas.unwrap().state == f1, "thomas was parsed correctly");
   assert!(tom.unwrap().state == c2, "tom was parsed correctly");
@@ -366,9 +380,9 @@ fn repetitions() {
 
   nfa.acceptance(g);
 
-  let post = nfa.process("posts/1", |a,b| a.len().cmp(&b.len()));
-  let new_post = nfa.process("posts/new", |a,b| a.len().cmp(&b.len()));
-  let invalid = nfa.process("posts/", |a,b| a.len().cmp(&b.len()));
+  let post = nfa.process("posts/1", |a,b| a.cmp(&b));
+  let new_post = nfa.process("posts/new", |a,b| a.cmp(&b));
+  let invalid = nfa.process("posts/", |a,b| a.cmp(&b));
 
   assert!(post.unwrap().state == g, "posts/1 was parsed");
   assert!(new_post.unwrap().state == g, "posts/new was parsed");
@@ -394,9 +408,9 @@ fn repetitions_with_ambiguous() {
   nfa.acceptance(g1);
   nfa.acceptance(i2);
 
-  let post = nfa.process("posts/1", |a,b| a.len().cmp(&b.len()));
-  let ambiguous = nfa.process("posts/new", |a,b| a.len().cmp(&b.len()));
-  let invalid = nfa.process("posts/", |a,b| a.len().cmp(&b.len()));
+  let post = nfa.process("posts/1", |a,b| a.cmp(&b));
+  let ambiguous = nfa.process("posts/new", |a,b| a.cmp(&b));
+  let invalid = nfa.process("posts/", |a,b| a.cmp(&b));
 
   assert!(post.unwrap().state == g1, "posts/1 was parsed");
   assert!(ambiguous.unwrap().state == i2, "posts/new was ambiguous");
@@ -414,9 +428,9 @@ fn captures() {
   nfa.start_capture(a);
   nfa.end_capture(c);
 
-  let post = nfa.process("new", |a,b| a.len().cmp(&b.len()));
+  let post = nfa.process("new", |a,b| a.cmp(&b));
 
-  assert_eq!(post.unwrap().captures, ~[~"new"]);
+  assert_eq!(post.unwrap().captures, ~[&"new"]);
 }
 
 #[test]
@@ -433,9 +447,9 @@ fn capture_mid_match() {
   nfa.start_capture(c);
   nfa.end_capture(c);
 
-  let post = nfa.process("p/123/c", |a,b| a.len().cmp(&b.len()));
+  let post = nfa.process("p/123/c", |a,b| a.cmp(&b));
 
-  assert_eq!(post.unwrap().captures, ~[~"123"]);
+  assert_eq!(post.unwrap().captures, ~[&"123"]);
 }
 
 #[test]
@@ -459,8 +473,8 @@ fn capture_multiple_captures() {
   nfa.start_capture(g);
   nfa.end_capture(g);
 
-  let post = nfa.process("p/123/c/456", |a,b| a.len().cmp(&b.len()));
-  assert_eq!(post.unwrap().captures, ~[~"123", ~"456"]);
+  let post = nfa.process("p/123/c/456", |a,b| a.cmp(&b));
+  assert_eq!(post.unwrap().captures, ~[&"123", &"456"]);
 }
 
 #[test]
@@ -485,7 +499,7 @@ fn bench_char_set(b: &mut extra::test::BenchHarness) {
   set.insert('/');
 
   b.iter(|| {
-    assert!(set.contains('p'));
+    assert!(set.contains('p'))
     assert!(set.contains('/'));
     assert!(!set.contains('z'));
   });

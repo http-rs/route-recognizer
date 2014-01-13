@@ -1,14 +1,57 @@
+extern mod extra;
 use std::hashmap::HashSet;
+use extra::treemap::TreeSet;
+
+#[deriving(Eq, Clone)]
+struct CharSet {
+  low_mask: u64,
+  high_mask: u64,
+  non_ascii: HashSet<char>
+}
+
+impl CharSet {
+  pub fn new() -> CharSet {
+    CharSet{ low_mask: 0, high_mask: 0, non_ascii: HashSet::new() }
+  }
+
+  pub fn insert(&mut self, char: char) {
+    let val = char as u64 - 1;
+
+    if val > 127 {
+      self.non_ascii.insert(char);
+    } else if val > 63 {
+      let bit = 1 << val - 64;
+      self.high_mask = self.high_mask | bit;
+    } else {
+      let bit = 1 << val;
+      self.low_mask = self.low_mask | bit;
+    }
+  }
+
+  pub fn contains(&self, char: char) -> bool {
+    let val = char as u64 - 1;
+
+    if val > 127 {
+      self.non_ascii.contains(&char)
+    } else if val > 63 {
+      let bit = 1 << val - 64;
+      self.high_mask & bit != 0
+    } else {
+      let bit = 1 << val;
+      self.low_mask & bit != 0
+    }
+  }
+}
 
 #[deriving(Eq, Clone)]
 pub enum CharacterClass {
-  ValidChars(HashSet<char>),
-  InvalidChars(HashSet<char>)
+  ValidChars(CharSet),
+  InvalidChars(CharSet)
 }
 
 impl CharacterClass {
   pub fn any() -> CharacterClass {
-    InvalidChars(HashSet::new())
+    InvalidChars(CharSet::new())
   }
 
   pub fn valid(string: &str) -> CharacterClass {
@@ -27,21 +70,21 @@ impl CharacterClass {
     InvalidChars(CharacterClass::char_to_set(char))
   }
 
-  pub fn matches(&self, char: &char) -> bool {
+  pub fn matches(&self, char: char) -> bool {
     match *self {
       ValidChars(ref valid) => valid.contains(char),
       InvalidChars(ref invalid) => !invalid.contains(char)
     }
   }
 
-  fn char_to_set(char: char) -> HashSet<char> {
-    let mut set = HashSet::new();
+  fn char_to_set(char: char) -> CharSet {
+    let mut set = CharSet::new();
     set.insert(char);
     set
   }
 
-  fn str_to_set(string: &str) -> HashSet<char> {
-    let mut set = HashSet::new();
+  fn str_to_set(string: &str) -> CharSet {
+    let mut set = CharSet::new();
     for char in string.chars() {
       set.insert(char);
     }
@@ -98,7 +141,7 @@ impl<T> NFA<T> {
     let mut current = ~[~[0]];
 
     for char in string.chars() {
-      let next_traces = self.process_char(current, &char);
+      let next_traces = self.process_char(current, char);
 
       if next_traces.is_empty() {
         return Err("Couldn't process " + string);
@@ -122,7 +165,7 @@ impl<T> NFA<T> {
     }
   }
 
-  fn process_char<'a>(&'a self, traces: ~[~[uint]], char: &char) -> ~[~[uint]] {
+  fn process_char<'a>(&'a self, traces: ~[~[uint]], char: char) -> ~[~[uint]] {
     let mut returned = ~[];
 
     for trace in traces.iter() {
@@ -402,6 +445,62 @@ fn capture_multiple_captures() {
   assert_eq!(post.unwrap().captures, ~[~"123", ~"456"]);
 }
 
+#[test]
+fn test_ascii_set() {
+  let mut set = CharSet::new();
+  set.insert('?');
+  set.insert('a');
+  set.insert('é');
+
+  assert!(set.contains('?'), "The set contains char 63");
+  assert!(set.contains('a'), "The set contains char 97");
+  assert!(set.contains('é'), "The set contains char 233");
+  assert!(!set.contains('q'), "The set does not contain q");
+  assert!(!set.contains('ü'), "The set does not contain ü");
+}
+
+#[bench]
+fn bench_char_set(b: &mut extra::test::BenchHarness) {
+  let mut set = CharSet::new();
+  set.insert('p');
+  set.insert('n');
+  set.insert('/');
+
+  b.iter(|| {
+    assert!(set.contains('p'));
+    assert!(set.contains('/'));
+    assert!(!set.contains('z'));
+  });
+}
+
+#[bench]
+fn bench_hash_set(b: &mut extra::test::BenchHarness) {
+  let mut set = HashSet::new();
+  set.insert('p');
+  set.insert('n');
+  set.insert('/');
+
+  b.iter(|| {
+    assert!(set.contains(&'p'));
+    assert!(set.contains(&'/'));
+    assert!(!set.contains(&'z'));
+  });
+}
+
+#[bench]
+fn bench_tree_set(b: &mut extra::test::BenchHarness) {
+  let mut set = TreeSet::new();
+  set.insert('p');
+  set.insert('n');
+  set.insert('/');
+
+  b.iter(|| {
+    assert!(set.contains(&'p'));
+    assert!(set.contains(&'/'));
+    assert!(!set.contains(&'z'));
+  });
+}
+
 #[allow(dead_code)]
 fn valid(char: char) -> CharacterClass {
   CharacterClass::valid_char(char)
@@ -411,3 +510,4 @@ fn valid(char: char) -> CharacterClass {
 fn invalid(char: char) -> CharacterClass {
   CharacterClass::invalid_char(char)
 }
+

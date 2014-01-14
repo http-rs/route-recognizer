@@ -145,13 +145,7 @@ impl Thread {
   }
 
   pub fn extract<'a>(&self, source: &'a str) -> ~[&'a str] {
-    let mut ret = ~[];
-
-    for &(begin, end) in self.captures.iter() {
-      ret.push(source.slice(begin, end))
-    }
-
-    ret
+    self.captures.iter().map(|&(begin, end)| source.slice(begin, end)).collect()
   }
 }
 

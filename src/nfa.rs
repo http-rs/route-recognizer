@@ -95,14 +95,13 @@ impl CharacterClass {
 #[deriving(Clone)]
 struct Thread {
   state: uint,
-  source: ~str,
   captures: ~[(uint, uint)],
   capture_begin: Option<uint>
 }
 
 impl Thread {
-  pub fn new(source: &str) -> Thread {
-    Thread{ state: 0, captures: ~[], capture_begin: None, source: source.to_owned() }
+  pub fn new() -> Thread {
+    Thread{ state: 0, captures: ~[], capture_begin: None }
   }
 
   pub fn start_capture(&mut self, start: uint) {
@@ -171,7 +170,7 @@ impl<T> NFA<T> {
   }
 
   pub fn process<'a>(&self, string: &'a str, sort: |a: uint, b: uint| -> Ordering) -> Result<Match<'a>, ~str> {
-    let mut threads = ~[Thread::new(string)];
+    let mut threads = ~[Thread::new()];
 
     for (i, char) in string.chars().enumerate() {
       let next_threads = self.process_char(threads, char, i);

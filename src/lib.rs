@@ -8,9 +8,9 @@ pub mod nfa;
 
 #[deriving(Clone)]
 struct Metadata {
-  statics: uint,
-  dynamics: uint,
-  stars: uint,
+  statics: int,
+  dynamics: int,
+  stars: int,
   param_names: ~[~str]
 }
 
@@ -38,6 +38,10 @@ impl TotalOrd for Metadata {
       Equal
     }
   }
+}
+
+impl Ord for Metadata {
+  fn lt(&self, other: &Metadata) -> bool { self.cmp(other) == Less }
 }
 
 impl TotalEq for Metadata {
@@ -125,7 +129,7 @@ impl<T> Router<T> {
     }
 
     let nfa = &self.nfa;
-    let result = nfa.process(path, |a,b| nfa.get(a).metadata.get_ref().cmp(nfa.get(b).metadata.get_ref()));
+    let result = nfa.process(path, |index| nfa.get(index).metadata.get_ref());
 
     match result {
       Ok(nfa_match) => {

@@ -1,6 +1,7 @@
 extern mod extra;
 use std::hashmap::HashSet;
 use extra::treemap::TreeSet;
+use std::u64;
 
 #[deriving(Eq, Clone)]
 struct CharSet {
@@ -45,35 +46,63 @@ impl CharSet {
 
 #[deriving(Eq, Clone)]
 pub enum CharacterClass {
+  Ascii(u64, u64, bool),
   ValidChars(CharSet),
   InvalidChars(CharSet)
 }
 
 impl CharacterClass {
   pub fn any() -> CharacterClass {
-    InvalidChars(CharSet::new())
+    Ascii(u64::max_value, u64::max_value, true)
   }
 
   pub fn valid(string: &str) -> CharacterClass {
     ValidChars(CharacterClass::str_to_set(string))
   }
 
-  pub fn valid_char(char: char) -> CharacterClass {
-    ValidChars(CharacterClass::char_to_set(char))
-  }
-
   pub fn invalid(string: &str) -> CharacterClass {
     InvalidChars(CharacterClass::str_to_set(string))
   }
 
-  pub fn invalid_char(char: char) -> CharacterClass {
-    InvalidChars(CharacterClass::char_to_set(char))
+  pub fn valid_char(char: char) -> CharacterClass {
+    let val = char as u64 - 1;
+
+    if val > 127 {
+      ValidChars(CharacterClass::char_to_set(char))
+    } else if val > 63 {
+      Ascii(1 << val - 64, 0, false)
+    } else {
+      Ascii(0, 1 << val, false)
+    }
   }
+
+  pub fn invalid_char(char: char) -> CharacterClass {
+    let val = char as u64 - 1;
+
+    if val > 127 {
+      InvalidChars(CharacterClass::char_to_set(char))
+    } else if val > 63 {
+      Ascii(u64::max_value ^ (1 << val - 64), u64::max_value, true)
+    } else {
+      Ascii(u64::max_value, u64::max_value ^ (1 << val), true)
+    }
+  }
+
 
   pub fn matches(&self, char: char) -> bool {
     match *self {
       ValidChars(ref valid) => valid.contains(char),
-      InvalidChars(ref invalid) => !invalid.contains(char)
+      InvalidChars(ref invalid) => !invalid.contains(char),
+      Ascii(high, low, unicode) => {
+        let val = char as u64 - 1;
+        if val > 127 {
+          unicode
+        } else if val > 63 {
+          high & (1 << (val - 64)) != 0
+        } else {
+          low & (1 << val) != 0
+        }
+      }
     }
   }
 
@@ -104,10 +133,12 @@ impl Thread {
     Thread{ state: 0, captures: ~[], capture_begin: None }
   }
 
+  #[inline]
   pub fn start_capture(&mut self, start: uint) {
     self.capture_begin = Some(start);
   }
 
+  #[inline]
   pub fn end_capture(&mut self, end: uint) {
     self.captures.push((self.capture_begin.unwrap(), end));
     self.capture_begin = None;
@@ -160,23 +191,26 @@ impl<'a> Match<'a> {
 
 #[deriving(Clone)]
 pub struct NFA<T> {
-  states: ~[State<T>]
+  states: ~[State<T>],
+  start_capture: ~[bool],
+  end_capture: ~[bool],
+  acceptance: ~[bool]
 }
 
 impl<T> NFA<T> {
   pub fn new() -> NFA<T> {
     let root = State::new(0, CharacterClass::any());
-    NFA{ states: ~[root] }
+    NFA{ states: ~[root], start_capture: ~[false], end_capture: ~[false], acceptance: ~[false] }
   }
 
-  pub fn process<'a>(&self, string: &'a str, sort: |a: uint, b: uint| -> Ordering) -> Result<Match<'a>, ~str> {
+  pub fn process<'a, I: Ord>(&self, string: &'a str, ord: |index: uint| -> I) -> Result<Match<'a>, ~str> {
     let mut threads = ~[Thread::new()];
 
     for (i, char) in string.chars().enumerate() {
       let next_threads = self.process_char(threads, char, i);
 
       if next_threads.is_empty() {
-        return Err("CoulDn't process " + string);
+        return Err("Couldn't process " + string);
       }
 
       threads = next_threads;
@@ -184,68 +218,62 @@ impl<T> NFA<T> {
 
     let mut returned = threads.move_iter().filter(|thread| {
       self.get(thread.state).acceptance
-    }).to_owned_vec();
+    });
 
-    if returned.is_empty() {
-      Err(~"The string was exhausted before reaching an acceptance state")
-    } else {
-      returned.sort_by(|a,b| sort(a.state, b.state));
-      let thread = &mut returned[returned.len() - 1];
-      if thread.capture_begin.is_some() { thread.end_capture(string.len()); }
+    let mut thread = returned.max_by(|thread| ord(thread.state));
 
-      let state = self.get(thread.state);
-      Ok(Match::new(state.index, thread.extract(string)))
+    match thread {
+      None => Err(~"The string was exhausted before reaching an acceptance state"),
+      Some(mut thread) => {
+        if thread.capture_begin.is_some() { thread.end_capture(string.len()); }
+
+        let state = self.get(thread.state);
+        Ok(Match::new(state.index, thread.extract(string)))
+      }
     }
   }
 
+  #[inline]
   fn process_char<'a>(&self, threads: ~[Thread], char: char, pos: uint) -> ~[Thread] {
-    let mut returned = ~[];
+    let mut returned = ::std::vec::with_capacity(threads.len());
 
     for mut thread in threads.move_iter() {
       let current_state = self.get(thread.state);
 
       let mut count = 0;
-      let mut found_state = None;
+      let mut found_state = 0;
 
       for &index in current_state.next_states.iter() {
-        let state = self.get(index);
+        let state = &self.states[index];
 
         if state.chars.matches(char) {
           count += 1;
-          found_state = Some(state);
+          found_state = index;
         }
       }
 
       if count == 1 {
-        thread.state = found_state.unwrap().index;
-        capture(&mut thread, current_state, found_state.unwrap(), pos);
+        thread.state = found_state;
+        capture(self, &mut thread, current_state.index, found_state, pos);
         returned.push(thread);
         continue;
       }
 
       for &index in current_state.next_states.iter() {
-        let state = self.get(index);
+        let state = &self.states[index];
         if state.chars.matches(char) {
           let mut thread = fork_thread(&thread, state);
-          capture(&mut thread, current_state, state, pos);
+          capture(self, &mut thread, current_state.index, index, pos);
           returned.push(thread);
         }
       }
 
-      fn capture<T>(thread: &mut Thread, current_state: &State<T>, next_state: &State<T>, pos: uint) {
-        if thread.capture_begin.is_none() && next_state.start_capture {
-          thread.start_capture(pos);
-        }
-
-        if thread.capture_begin.is_some() && current_state.end_capture && next_state.index > current_state.index {
-          thread.end_capture(pos);
-        }
-      }
     }
 
     returned
   }
 
+  #[inline]
   pub fn get<'a>(&'a self, state: uint) -> &'a State<T> {
     &self.states[state]
   }
@@ -277,14 +305,17 @@ impl<T> NFA<T> {
 
   pub fn acceptance(&mut self, index: uint) {
     self.get_mut(index).acceptance = true;
+    self.acceptance[index] = true;
   }
 
   pub fn start_capture(&mut self, index: uint) {
     self.get_mut(index).start_capture = true;
+    self.start_capture[index] = true;
   }
 
   pub fn end_capture(&mut self, index: uint) {
     self.get_mut(index).end_capture = true;
+    self.end_capture[index] = true;
   }
 
   pub fn metadata(&mut self, index: uint, metadata: T) {
@@ -295,14 +326,31 @@ impl<T> NFA<T> {
     let index = self.states.len();
     let state = State::new(index, chars);
     self.states.push(state);
+
+    self.acceptance.push(false);
+    self.start_capture.push(false);
+    self.end_capture.push(false);
+
     index
   }
 }
 
+#[inline]
 fn fork_thread<T>(thread: &Thread, state: &State<T>) -> Thread {
   let mut new_trace = thread.clone();
   new_trace.state = state.index;
   new_trace
+}
+
+#[inline]
+fn capture<T>(nfa: &NFA<T>, thread: &mut Thread, current_state: uint, next_state: uint, pos: uint) {
+  if thread.capture_begin == None && nfa.start_capture[next_state] {
+    thread.start_capture(pos);
+  }
+
+  if thread.capture_begin != None && nfa.end_capture[current_state] && next_state > current_state {
+    thread.end_capture(pos);
+  }
 }
 
 #[test]
@@ -315,7 +363,7 @@ fn basic_test() {
   let e = nfa.put(d, CharacterClass::valid("o"));
   nfa.acceptance(e);
 
-  let m = nfa.process("hello", |a,b| a.cmp(&b));
+  let m = nfa.process("hello", |a| a);
 
   assert!(m.unwrap().state == e, "You didn't get the right final state");
 }
@@ -333,7 +381,7 @@ fn multiple_solutions() {
   let c2 = nfa.put(b2, CharacterClass::invalid(""));
   nfa.acceptance(c2);
 
-  let m = nfa.process("new", |a,b| a.cmp(&b));
+  let m = nfa.process("new", |a| a);
 
   assert!(m.unwrap().state == c2, "The two states were not found");
 }
@@ -354,10 +402,10 @@ fn multiple_paths() {
   nfa.acceptance(f1);
   nfa.acceptance(c2);
 
-  let thomas = nfa.process("thomas", |a,b| a.cmp(&b));
-  let tom = nfa.process("tom", |a,b| a.cmp(&b));
-  let thom = nfa.process("thom", |a,b| a.cmp(&b));
-  let nope = nfa.process("nope", |a,b| a.cmp(&b));
+  let thomas = nfa.process("thomas", |a| a);
+  let tom = nfa.process("tom", |a| a);
+  let thom = nfa.process("thom", |a| a);
+  let nope = nfa.process("nope", |a| a);
 
   assert!(thomas.unwrap().state == f1, "thomas was parsed correctly");
   assert!(tom.unwrap().state == c2, "tom was parsed correctly");
@@ -379,9 +427,9 @@ fn repetitions() {
 
   nfa.acceptance(g);
 
-  let post = nfa.process("posts/1", |a,b| a.cmp(&b));
-  let new_post = nfa.process("posts/new", |a,b| a.cmp(&b));
-  let invalid = nfa.process("posts/", |a,b| a.cmp(&b));
+  let post = nfa.process("posts/1", |a| a);
+  let new_post = nfa.process("posts/new", |a| a);
+  let invalid = nfa.process("posts/", |a| a);
 
   assert!(post.unwrap().state == g, "posts/1 was parsed");
   assert!(new_post.unwrap().state == g, "posts/new was parsed");
@@ -407,9 +455,9 @@ fn repetitions_with_ambiguous() {
   nfa.acceptance(g1);
   nfa.acceptance(i2);
 
-  let post = nfa.process("posts/1", |a,b| a.cmp(&b));
-  let ambiguous = nfa.process("posts/new", |a,b| a.cmp(&b));
-  let invalid = nfa.process("posts/", |a,b| a.cmp(&b));
+  let post = nfa.process("posts/1", |a| a);
+  let ambiguous = nfa.process("posts/new", |a| a);
+  let invalid = nfa.process("posts/", |a| a);
 
   assert!(post.unwrap().state == g1, "posts/1 was parsed");
   assert!(ambiguous.unwrap().state == i2, "posts/new was ambiguous");
@@ -427,7 +475,7 @@ fn captures() {
   nfa.start_capture(a);
   nfa.end_capture(c);
 
-  let post = nfa.process("new", |a,b| a.cmp(&b));
+  let post = nfa.process("new", |a| a);
 
   assert_eq!(post.unwrap().captures, ~[&"new"]);
 }
@@ -446,7 +494,7 @@ fn capture_mid_match() {
   nfa.start_capture(c);
   nfa.end_capture(c);
 
-  let post = nfa.process("p/123/c", |a,b| a.cmp(&b));
+  let post = nfa.process("p/123/c", |a| a);
 
   assert_eq!(post.unwrap().captures, ~[&"123"]);
 }
@@ -472,7 +520,7 @@ fn capture_multiple_captures() {
   nfa.start_capture(g);
   nfa.end_capture(g);
 
-  let post = nfa.process("p/123/c/456", |a,b| a.cmp(&b));
+  let post = nfa.process("p/123/c/456", |a| a);
   assert_eq!(post.unwrap().captures, ~[&"123", &"456"]);
 }
 

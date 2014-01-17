@@ -1,4 +1,5 @@
 #[crate_id = "route_recognizer#0.1.0"];
+#[crate_type = "lib"];
 
 extern mod extra;
 use nfa::NFA;

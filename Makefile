@@ -1,5 +1,5 @@
 default:
-	cd src && rustc --rlib --opt-level=3 lib.rs
+	cd src && rustc --opt-level=3 lib.rs
 
 test:
 	cd src && \

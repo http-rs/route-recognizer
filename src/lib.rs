@@ -113,7 +113,7 @@ impl<T> Router<T> {
     for (i, segment) in route.split('/').enumerate() {
       if i > 0 { state = nfa.put(state, CharacterClass::valid_char('/')); }
 
-      if segment.char_at(0) == ':' {
+      if segment.len() > 0 && segment.char_at(0) == ':' {
         state = process_dynamic_segment(nfa, state);
         metadata.dynamics += 1;
         metadata.param_names.push(segment.slice_from(1).to_str());
@@ -184,6 +184,13 @@ fn basic_router() {
 
   assert_eq!(*m.handler, "Thomas".to_str());
   assert_eq!(m.params, Params::new());
+}
+
+#[test]
+fn root_router() {
+  let mut router = Router::new();
+  router.add("/", 10);
+  assert_eq!(*router.recognize("/").unwrap().handler, 10)
 }
 
 #[test]

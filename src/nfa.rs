@@ -1,10 +1,11 @@
-extern mod extra;
-use std::hashmap::HashSet;
-use extra::treemap::TreeSet;
+use std::collections::HashSet;
 use std::u64;
 
-#[deriving(Eq, Clone)]
-struct CharSet {
+#[cfg(test)] use test;
+#[cfg(test)] use std::collections::TreeSet;
+
+#[deriving(PartialEq, Eq, Clone)]
+pub struct CharSet {
   low_mask: u64,
   high_mask: u64,
   non_ascii: HashSet<char>
@@ -44,7 +45,7 @@ impl CharSet {
   }
 }
 
-#[deriving(Eq, Clone)]
+#[deriving(PartialEq, Eq, Clone)]
 pub enum CharacterClass {
   Ascii(u64, u64, bool),
   ValidChars(CharSet),
@@ -53,7 +54,7 @@ pub enum CharacterClass {
 
 impl CharacterClass {
   pub fn any() -> CharacterClass {
-    Ascii(u64::max_value, u64::max_value, true)
+    Ascii(u64::MAX, u64::MAX, true)
   }
 
   pub fn valid(string: &str) -> CharacterClass {
@@ -82,9 +83,9 @@ impl CharacterClass {
     if val > 127 {
       InvalidChars(CharacterClass::char_to_set(char))
     } else if val > 63 {
-      Ascii(u64::max_value ^ (1 << val - 64), u64::max_value, true)
+      Ascii(u64::MAX ^ (1 << val - 64), u64::MAX, true)
     } else {
-      Ascii(u64::max_value, u64::max_value ^ (1 << val), true)
+      Ascii(u64::MAX, u64::MAX ^ (1 << val), true)
     }
   }
 
@@ -124,13 +125,13 @@ impl CharacterClass {
 #[deriving(Clone)]
 struct Thread {
   state: uint,
-  captures: ~[(uint, uint)],
+  captures: Vec<(uint, uint)>,
   capture_begin: Option<uint>
 }
 
 impl Thread {
   pub fn new() -> Thread {
-    Thread{ state: 0, captures: ~[], capture_begin: None }
+    Thread{ state: 0, captures: Vec::new(), capture_begin: None }
   }
 
   #[inline]
@@ -144,23 +145,23 @@ impl Thread {
     self.capture_begin = None;
   }
 
-  pub fn extract<'a>(&self, source: &'a str) -> ~[&'a str] {
+  pub fn extract<'a>(&self, source: &'a str) -> Vec<&'a str> {
     self.captures.iter().map(|&(begin, end)| source.slice(begin, end)).collect()
   }
 }
 
 #[deriving(Clone)]
-struct State<T> {
-  index: uint,
-  chars: CharacterClass,
-  next_states: ~[uint],
-  acceptance: bool,
-  start_capture: bool,
-  end_capture: bool,
-  metadata: Option<T>
+pub struct State<T> {
+  pub index: uint,
+  pub chars: CharacterClass,
+  pub next_states: Vec<uint>,
+  pub acceptance: bool,
+  pub start_capture: bool,
+  pub end_capture: bool,
+  pub metadata: Option<T>
 }
 
-impl<T> Eq for State<T> {
+impl<T> PartialEq for State<T> {
   fn eq(&self, other: &State<T>) -> bool {
     self.index == other.index
   }
@@ -168,43 +169,48 @@ impl<T> Eq for State<T> {
 
 impl<T> State<T> {
   pub fn new(index: uint, chars: CharacterClass) -> State<T> {
-    State{ index: index, chars: chars, next_states: ~[], acceptance: false, start_capture: false, end_capture: false, metadata: None }
+    State{ index: index, chars: chars, next_states: Vec::new(),
+           acceptance: false, start_capture: false, end_capture: false,
+           metadata: None }
   }
 }
 
 pub struct Match<'a> {
-  state: uint,
-  captures: ~[&'a str]
+  pub state: uint,
+  pub captures: Vec<&'a str>,
 }
 
 impl<'a> Match<'a> {
-  pub fn new<'a>(state: uint, captures: ~[&'a str]) -> Match<'a> {
+  pub fn new<'a>(state: uint, captures: Vec<&'a str>) -> Match<'a> {
     Match{ state: state, captures: captures }
   }
 }
 
 #[deriving(Clone)]
 pub struct NFA<T> {
-  states: ~[State<T>],
-  start_capture: ~[bool],
-  end_capture: ~[bool],
-  acceptance: ~[bool]
+  states: Vec<State<T>>,
+  start_capture: Vec<bool>,
+  end_capture: Vec<bool>,
+  acceptance: Vec<bool>,
 }
 
 impl<T> NFA<T> {
   pub fn new() -> NFA<T> {
     let root = State::new(0, CharacterClass::any());
-    NFA{ states: ~[root], start_capture: ~[false], end_capture: ~[false], acceptance: ~[false] }
+    NFA{ states: vec![root], start_capture: vec![false],
+         end_capture: vec![false], acceptance: vec![false] }
   }
 
-  pub fn process<'a, I: Ord>(&self, string: &'a str, ord: |index: uint| -> I) -> Result<Match<'a>, ~str> {
-    let mut threads = ~[Thread::new()];
+  pub fn process<'a, I: Ord>(&self, string: &'a str, ord: |index: uint| -> I)
+      -> Result<Match<'a>, String>
+  {
+    let mut threads = vec![Thread::new()];
 
     for (i, char) in string.chars().enumerate() {
       let next_threads = self.process_char(threads, char, i);
 
       if next_threads.is_empty() {
-        return Err("Couldn't process " + string);
+        return Err(format!("Couldn't process {}", string));
       }
 
       threads = next_threads;
@@ -214,10 +220,11 @@ impl<T> NFA<T> {
       self.get(thread.state).acceptance
     });
 
-    let mut thread = returned.max_by(|thread| ord(thread.state));
+    let thread = returned.max_by(|thread| ord(thread.state));
 
     match thread {
-      None => Err(~"The string was exhausted before reaching an acceptance state"),
+      None => Err("The string was exhausted before reaching \
+                   an acceptance state".to_str()),
       Some(mut thread) => {
         if thread.capture_begin.is_some() { thread.end_capture(string.len()); }
 
@@ -228,8 +235,9 @@ impl<T> NFA<T> {
   }
 
   #[inline]
-  fn process_char<'a>(&self, threads: ~[Thread], char: char, pos: uint) -> ~[Thread] {
-    let mut returned = ::std::vec::with_capacity(threads.len());
+  fn process_char<'a>(&self, threads: Vec<Thread>,
+                      char: char, pos: uint) -> Vec<Thread> {
+    let mut returned = Vec::with_capacity(threads.len());
 
     for mut thread in threads.move_iter() {
       let current_state = self.get(thread.state);
@@ -238,7 +246,7 @@ impl<T> NFA<T> {
       let mut found_state = 0;
 
       for &index in current_state.next_states.iter() {
-        let state = &self.states[index];
+        let state = self.states.get(index);
 
         if state.chars.matches(char) {
           count += 1;
@@ -254,7 +262,7 @@ impl<T> NFA<T> {
       }
 
       for &index in current_state.next_states.iter() {
-        let state = &self.states[index];
+        let state = self.states.get(index);
         if state.chars.matches(char) {
           let mut thread = fork_thread(&thread, state);
           capture(self, &mut thread, current_state.index, index, pos);
@@ -269,11 +277,11 @@ impl<T> NFA<T> {
 
   #[inline]
   pub fn get<'a>(&'a self, state: uint) -> &'a State<T> {
-    &self.states[state]
+    self.states.get(state)
   }
 
   pub fn get_mut<'a>(&'a mut self, state: uint) -> &'a mut State<T> {
-    &mut self.states[state]
+    self.states.get_mut(state)
   }
 
   pub fn put(&mut self, index: uint, chars: CharacterClass) -> uint {
@@ -299,17 +307,17 @@ impl<T> NFA<T> {
 
   pub fn acceptance(&mut self, index: uint) {
     self.get_mut(index).acceptance = true;
-    self.acceptance[index] = true;
+    *self.acceptance.get_mut(index) = true;
   }
 
   pub fn start_capture(&mut self, index: uint) {
     self.get_mut(index).start_capture = true;
-    self.start_capture[index] = true;
+    *self.start_capture.get_mut(index) = true;
   }
 
   pub fn end_capture(&mut self, index: uint) {
     self.get_mut(index).end_capture = true;
-    self.end_capture[index] = true;
+    *self.end_capture.get_mut(index) = true;
   }
 
   pub fn metadata(&mut self, index: uint, metadata: T) {
@@ -338,11 +346,12 @@ fn fork_thread<T>(thread: &Thread, state: &State<T>) -> Thread {
 
 #[inline]
 fn capture<T>(nfa: &NFA<T>, thread: &mut Thread, current_state: uint, next_state: uint, pos: uint) {
-  if thread.capture_begin == None && nfa.start_capture[next_state] {
+  if thread.capture_begin == None && *nfa.start_capture.get(next_state) {
     thread.start_capture(pos);
   }
 
-  if thread.capture_begin != None && nfa.end_capture[current_state] && next_state > current_state {
+  if thread.capture_begin != None && *nfa.end_capture.get(current_state) &&
+     next_state > current_state {
     thread.end_capture(pos);
   }
 }
@@ -471,7 +480,7 @@ fn captures() {
 
   let post = nfa.process("new", |a| a);
 
-  assert_eq!(post.unwrap().captures, ~[&"new"]);
+  assert_eq!(post.unwrap().captures, vec!["new"]);
 }
 
 #[test]
@@ -490,7 +499,7 @@ fn capture_mid_match() {
 
   let post = nfa.process("p/123/c", |a| a);
 
-  assert_eq!(post.unwrap().captures, ~[&"123"]);
+  assert_eq!(post.unwrap().captures, vec!["123"]);
 }
 
 #[test]
@@ -515,7 +524,7 @@ fn capture_multiple_captures() {
   nfa.end_capture(g);
 
   let post = nfa.process("p/123/c/456", |a| a);
-  assert_eq!(post.unwrap().captures, ~[&"123", &"456"]);
+  assert_eq!(post.unwrap().captures, vec!["123", "456"]);
 }
 
 #[test]
@@ -533,7 +542,7 @@ fn test_ascii_set() {
 }
 
 #[bench]
-fn bench_char_set(b: &mut extra::test::BenchHarness) {
+fn bench_char_set(b: &mut test::Bencher) {
   let mut set = CharSet::new();
   set.insert('p');
   set.insert('n');
@@ -547,7 +556,7 @@ fn bench_char_set(b: &mut extra::test::BenchHarness) {
 }
 
 #[bench]
-fn bench_hash_set(b: &mut extra::test::BenchHarness) {
+fn bench_hash_set(b: &mut test::Bencher) {
   let mut set = HashSet::new();
   set.insert('p');
   set.insert('n');
@@ -561,7 +570,7 @@ fn bench_hash_set(b: &mut extra::test::BenchHarness) {
 }
 
 #[bench]
-fn bench_tree_set(b: &mut extra::test::BenchHarness) {
+fn bench_tree_set(b: &mut test::Bencher) {
   let mut set = TreeSet::new();
   set.insert('p');
   set.insert('n');

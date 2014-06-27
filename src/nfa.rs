@@ -17,7 +17,7 @@ impl CharSet {
   }
 
   pub fn insert(&mut self, char: char) {
-    let val = char as u64 - 1;
+    let val = char as uint - 1;
 
     if val > 127 {
       self.non_ascii.insert(char);
@@ -31,7 +31,7 @@ impl CharSet {
   }
 
   pub fn contains(&self, char: char) -> bool {
-    let val = char as u64 - 1;
+    let val = char as uint - 1;
 
     if val > 127 {
       self.non_ascii.contains(&char)
@@ -66,7 +66,7 @@ impl CharacterClass {
   }
 
   pub fn valid_char(char: char) -> CharacterClass {
-    let val = char as u64 - 1;
+    let val = char as uint - 1;
 
     if val > 127 {
       ValidChars(CharacterClass::char_to_set(char))
@@ -78,7 +78,7 @@ impl CharacterClass {
   }
 
   pub fn invalid_char(char: char) -> CharacterClass {
-    let val = char as u64 - 1;
+    let val = char as uint - 1;
 
     if val > 127 {
       InvalidChars(CharacterClass::char_to_set(char))
@@ -95,7 +95,7 @@ impl CharacterClass {
       ValidChars(ref valid) => valid.contains(char),
       InvalidChars(ref invalid) => !invalid.contains(char),
       Ascii(high, low, unicode) => {
-        let val = char as u64 - 1;
+        let val = char as uint - 1;
         if val > 127 {
           unicode
         } else if val > 63 {

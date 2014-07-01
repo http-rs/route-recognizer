@@ -44,7 +44,9 @@ impl Ord for Metadata {
 }
 
 impl PartialOrd for Metadata {
-  fn lt(&self, other: &Metadata) -> bool { self.cmp(other) == Less }
+  fn partial_cmp(&self, other: &Metadata) -> Option<Ordering> {
+    Some(self.cmp(other))
+  }
 }
 
 impl PartialEq for Metadata {
@@ -189,7 +191,7 @@ fn basic_router() {
 #[test]
 fn root_router() {
   let mut router = Router::new();
-  router.add("/", 10);
+  router.add("/", 10i);
   assert_eq!(*router.recognize("/").unwrap().handler, 10)
 }
 

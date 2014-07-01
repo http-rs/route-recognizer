@@ -242,7 +242,7 @@ impl<T> NFA<T> {
     for mut thread in threads.move_iter() {
       let current_state = self.get(thread.state);
 
-      let mut count = 0;
+      let mut count = 0i;
       let mut found_state = 0;
 
       for &index in current_state.next_states.iter() {

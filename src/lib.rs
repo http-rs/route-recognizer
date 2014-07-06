@@ -119,6 +119,10 @@ impl<T> Router<T> {
         state = process_dynamic_segment(nfa, state);
         metadata.dynamics += 1;
         metadata.param_names.push(segment.slice_from(1).to_str());
+      } else if segment.len() > 0 && segment.char_at(0) == '*' {
+        state = process_star_state(nfa, state);
+        metadata.stars += 1;
+        metadata.param_names.push(segment.slice_from(1).to_str());
       } else {
         state = process_static_segment(segment, nfa, state);
         metadata.statics += 1;
@@ -167,6 +171,15 @@ fn process_static_segment<T>(segment: &str, nfa: &mut NFA<T>, mut state: uint) -
 
 fn process_dynamic_segment<T>(nfa: &mut NFA<T>, mut state: uint) -> uint {
   state = nfa.put(state, CharacterClass::invalid_char('/'));
+  nfa.put_state(state, state);
+  nfa.start_capture(state);
+  nfa.end_capture(state);
+
+  state
+}
+
+fn process_star_state<T>(nfa: &mut NFA<T>, mut state: uint) -> uint {
+  state = nfa.put(state, CharacterClass::any());
   nfa.put_state(state, state);
   nfa.start_capture(state);
   nfa.end_capture(state);
@@ -230,7 +243,6 @@ fn ambiguous_router_b() {
   assert_eq!(new.params, Params::new());
 }
 
-
 #[test]
 fn multiple_params() {
   let mut router = Router::new();
@@ -247,6 +259,26 @@ fn multiple_params() {
   assert_eq!(*coms.handler, "comments".to_str());
   assert_eq!(coms.params, params("post_id", "12"));
   assert_eq!(coms.params["post_id"], "12".to_str());
+}
+
+#[test]
+fn star() {
+  let mut router = Router::new();
+
+  router.add("*foo", "test".to_str());
+  router.add("/bar/*foo", "test2".to_str());
+
+  let m = router.recognize("/test").unwrap();
+  assert_eq!(*m.handler, "test".to_str());
+  assert_eq!(m.params, params("foo", "test"));
+
+  let m = router.recognize("/foo/bar").unwrap();
+  assert_eq!(*m.handler, "test".to_str());
+  assert_eq!(m.params, params("foo", "foo/bar"));
+
+  let m = router.recognize("/bar/foo").unwrap();
+  assert_eq!(*m.handler, "test".to_str());
+  assert_eq!(m.params, params("foo", "bar/foo"));
 }
 
 #[bench]

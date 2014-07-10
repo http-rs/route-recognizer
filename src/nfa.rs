@@ -224,7 +224,7 @@ impl<T> NFA<T> {
 
     match thread {
       None => Err("The string was exhausted before reaching \
-                   an acceptance state".to_str()),
+                   an acceptance state".to_string()),
       Some(mut thread) => {
         if thread.capture_begin.is_some() { thread.end_capture(string.len()); }
 

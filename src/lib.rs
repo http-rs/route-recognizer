@@ -1,4 +1,4 @@
-#![crate_id = "route_recognizer#0.1.0"]
+#![crate_name = "route_recognizer"]
 #![crate_type = "rlib"]
 
 #[cfg(test)] extern crate test;
@@ -72,11 +72,11 @@ impl Params {
   }
 }
 
-impl<'a> Index<&'static str, String> for Params {
-  fn index(&self, index: & &'static str) -> String {
-    match self.map.find(&index.to_str()) {
+impl Index<&'static str, String> for Params {
+  fn index<'a>(&'a self, index: &&'static str) -> &'a String {
+    match self.map.find(&index.to_string()) {
       None => fail!(format!("params[{}] did not exist", index)),
-      Some(s) => s.to_str()
+      Some(s) => s,
     }
   }
 }
@@ -118,11 +118,11 @@ impl<T> Router<T> {
       if segment.len() > 0 && segment.char_at(0) == ':' {
         state = process_dynamic_segment(nfa, state);
         metadata.dynamics += 1;
-        metadata.param_names.push(segment.slice_from(1).to_str());
+        metadata.param_names.push(segment.slice_from(1).to_string());
       } else if segment.len() > 0 && segment.char_at(0) == '*' {
         state = process_star_state(nfa, state);
         metadata.stars += 1;
-        metadata.param_names.push(segment.slice_from(1).to_str());
+        metadata.param_names.push(segment.slice_from(1).to_string());
       } else {
         state = process_static_segment(segment, nfa, state);
         metadata.statics += 1;
@@ -150,7 +150,7 @@ impl<T> Router<T> {
         let param_names = metadata.param_names.clone();
 
         for (i, capture) in nfa_match.captures.iter().enumerate() {
-          map.insert(param_names.get(i).to_str(), capture.to_str());
+          map.insert(param_names.get(i).to_string(), capture.to_string());
         }
 
         let handler = self.handlers.find(&nfa_match.state).unwrap();
@@ -191,13 +191,13 @@ fn process_star_state<T>(nfa: &mut NFA<T>, mut state: uint) -> uint {
 fn basic_router() {
   let mut router = Router::new();
 
-  router.add("/thomas", "Thomas".to_str());
-  router.add("/tom", "Tom".to_str());
-  router.add("/wycats", "Yehuda".to_str());
+  router.add("/thomas", "Thomas".to_string());
+  router.add("/tom", "Tom".to_string());
+  router.add("/wycats", "Yehuda".to_string());
 
   let m = router.recognize("/thomas").unwrap();
 
-  assert_eq!(*m.handler, "Thomas".to_str());
+  assert_eq!(*m.handler, "Thomas".to_string());
   assert_eq!(m.params, Params::new());
 }
 
@@ -212,16 +212,16 @@ fn root_router() {
 fn ambiguous_router() {
   let mut router = Router::new();
 
-  router.add("/posts/new", "new".to_str());
-  router.add("/posts/:id", "id".to_str());
+  router.add("/posts/new", "new".to_string());
+  router.add("/posts/:id", "id".to_string());
 
   let id = router.recognize("/posts/1").unwrap();
 
-  assert_eq!(*id.handler, "id".to_str());
+  assert_eq!(*id.handler, "id".to_string());
   assert_eq!(id.params, params("id", "1"));
 
   let new = router.recognize("/posts/new").unwrap();
-  assert_eq!(*new.handler, "new".to_str());
+  assert_eq!(*new.handler, "new".to_string());
   assert_eq!(new.params, Params::new());
 }
 
@@ -230,16 +230,16 @@ fn ambiguous_router() {
 fn ambiguous_router_b() {
   let mut router = Router::new();
 
-  router.add("/posts/:id", "id".to_str());
-  router.add("/posts/new", "new".to_str());
+  router.add("/posts/:id", "id".to_string());
+  router.add("/posts/new", "new".to_string());
 
   let id = router.recognize("/posts/1").unwrap();
 
-  assert_eq!(*id.handler, "id".to_str());
+  assert_eq!(*id.handler, "id".to_string());
   assert_eq!(id.params, params("id", "1"));
 
   let new = router.recognize("/posts/new").unwrap();
-  assert_eq!(*new.handler, "new".to_str());
+  assert_eq!(*new.handler, "new".to_string());
   assert_eq!(new.params, Params::new());
 }
 
@@ -247,49 +247,49 @@ fn ambiguous_router_b() {
 fn multiple_params() {
   let mut router = Router::new();
 
-  router.add("/posts/:post_id/comments/:id", "comment".to_str());
-  router.add("/posts/:post_id/comments", "comments".to_str());
+  router.add("/posts/:post_id/comments/:id", "comment".to_string());
+  router.add("/posts/:post_id/comments", "comments".to_string());
 
   let com = router.recognize("/posts/12/comments/100").unwrap();
   let coms = router.recognize("/posts/12/comments").unwrap();
 
-  assert_eq!(*com.handler, "comment".to_str());
+  assert_eq!(*com.handler, "comment".to_string());
   assert_eq!(com.params, two_params("post_id", "12", "id", "100"));
 
-  assert_eq!(*coms.handler, "comments".to_str());
+  assert_eq!(*coms.handler, "comments".to_string());
   assert_eq!(coms.params, params("post_id", "12"));
-  assert_eq!(coms.params["post_id"], "12".to_str());
+  assert_eq!(coms.params["post_id"], "12".to_string());
 }
 
 #[test]
 fn star() {
   let mut router = Router::new();
 
-  router.add("*foo", "test".to_str());
-  router.add("/bar/*foo", "test2".to_str());
+  router.add("*foo", "test".to_string());
+  router.add("/bar/*foo", "test2".to_string());
 
   let m = router.recognize("/test").unwrap();
-  assert_eq!(*m.handler, "test".to_str());
+  assert_eq!(*m.handler, "test".to_string());
   assert_eq!(m.params, params("foo", "test"));
 
   let m = router.recognize("/foo/bar").unwrap();
-  assert_eq!(*m.handler, "test".to_str());
+  assert_eq!(*m.handler, "test".to_string());
   assert_eq!(m.params, params("foo", "foo/bar"));
 
   let m = router.recognize("/bar/foo").unwrap();
-  assert_eq!(*m.handler, "test".to_str());
+  assert_eq!(*m.handler, "test".to_string());
   assert_eq!(m.params, params("foo", "bar/foo"));
 }
 
 #[bench]
 fn benchmark(b: &mut test::Bencher) {
   let mut router = Router::new();
-  router.add("/posts/:post_id/comments/:id", "comment".to_str());
-  router.add("/posts/:post_id/comments", "comments".to_str());
-  router.add("/posts/:post_id", "post".to_str());
-  router.add("/posts", "posts".to_str());
-  router.add("/comments", "comments2".to_str());
-  router.add("/comments/:id", "comment2".to_str());
+  router.add("/posts/:post_id/comments/:id", "comment".to_string());
+  router.add("/posts/:post_id/comments", "comments".to_string());
+  router.add("/posts/:post_id", "post".to_string());
+  router.add("/posts", "posts".to_string());
+  router.add("/comments", "comments2".to_string());
+  router.add("/comments/:id", "comment2".to_string());
 
   b.iter(|| {
     router.recognize("/posts/100/comments/200")
@@ -299,14 +299,14 @@ fn benchmark(b: &mut test::Bencher) {
 #[allow(dead_code)]
 fn params(key: &str, val: &str) -> Params {
   let mut map = Params::new();
-  map.insert(key.to_str(), val.to_str());
+  map.insert(key.to_string(), val.to_string());
   map
 }
 
 #[allow(dead_code)]
 fn two_params(k1: &str, v1: &str, k2: &str, v2: &str) -> Params {
   let mut map = Params::new();
-  map.insert(k1.to_str(), v1.to_str());
-  map.insert(k2.to_str(), v2.to_str());
+  map.insert(k1.to_string(), v1.to_string());
+  map.insert(k2.to_string(), v2.to_string());
   map
 }

@@ -1,6 +1,3 @@
-#![crate_name = "route_recognizer"]
-#![crate_type = "rlib"]
-
 #[cfg(test)] extern crate test;
 
 use nfa::NFA;

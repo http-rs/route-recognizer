@@ -246,7 +246,7 @@ impl<T> NFA<T> {
       let mut found_state = 0;
 
       for &index in current_state.next_states.iter() {
-        let state = self.states.get(index);
+        let state = &self.states[index];
 
         if state.chars.matches(char) {
           count += 1;
@@ -262,7 +262,7 @@ impl<T> NFA<T> {
       }
 
       for &index in current_state.next_states.iter() {
-        let state = self.states.get(index);
+        let state = &self.states[index];
         if state.chars.matches(char) {
           let mut thread = fork_thread(&thread, state);
           capture(self, &mut thread, current_state.index, index, pos);
@@ -277,7 +277,7 @@ impl<T> NFA<T> {
 
   #[inline]
   pub fn get<'a>(&'a self, state: uint) -> &'a State<T> {
-    self.states.get(state)
+    &self.states[state]
   }
 
   pub fn get_mut<'a>(&'a mut self, state: uint) -> &'a mut State<T> {
@@ -346,11 +346,11 @@ fn fork_thread<T>(thread: &Thread, state: &State<T>) -> Thread {
 
 #[inline]
 fn capture<T>(nfa: &NFA<T>, thread: &mut Thread, current_state: uint, next_state: uint, pos: uint) {
-  if thread.capture_begin == None && *nfa.start_capture.get(next_state) {
+  if thread.capture_begin == None && nfa.start_capture[next_state] {
     thread.start_capture(pos);
   }
 
-  if thread.capture_begin != None && *nfa.end_capture.get(current_state) &&
+  if thread.capture_begin != None && nfa.end_capture[current_state] &&
      next_state > current_state {
     thread.end_capture(pos);
   }

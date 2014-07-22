@@ -147,7 +147,7 @@ impl<T> Router<T> {
         let param_names = metadata.param_names.clone();
 
         for (i, capture) in nfa_match.captures.iter().enumerate() {
-          map.insert(param_names.get(i).to_string(), capture.to_string());
+          map.insert(param_names[i].to_string(), capture.to_string());
         }
 
         let handler = self.handlers.find(&nfa_match.state).unwrap();

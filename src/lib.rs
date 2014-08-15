@@ -206,6 +206,20 @@ fn root_router() {
 }
 
 #[test]
+fn empty_path() {
+  let mut router = Router::new();
+  router.add("/", 12i);
+  assert_eq!(*router.recognize("").unwrap().handler, 12)
+}
+
+#[test]
+fn empty_route() {
+  let mut router = Router::new();
+  router.add("", 12i);
+  assert_eq!(*router.recognize("/").unwrap().handler, 12)
+}
+
+#[test]
 fn ambiguous_router() {
     let mut router = Router::new();
 

@@ -67,6 +67,10 @@ impl Params {
     pub fn insert(&mut self, key: String, value: String) {
         self.map.insert(key, value);
     }
+
+    pub fn find<'a>(&'a self, key: &str) -> Option<&'a str> {
+        self.map.find_with(|k| key.cmp(&k.as_slice())).map(|s| s.as_slice())
+    }
 }
 
 impl Index<&'static str, String> for Params {

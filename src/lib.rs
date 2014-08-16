@@ -105,8 +105,8 @@ impl<T> Router<T> {
     }
 
     pub fn add(&mut self, mut route: &str, dest: T) {
-        if route.char_at(0) == '/' {
-            route = route.slice_from(1);
+        if route.len() != 0 && route.char_at(0) == '/' {
+            route = route.slice_from(1)
         }
 
         let nfa = &mut self.nfa;
@@ -136,7 +136,7 @@ impl<T> Router<T> {
     }
 
     pub fn recognize<'a>(&'a self, mut path: &str) -> Result<Match<&'a T>, String> {
-        if path.char_at(0) == '/' {
+        if path.len() != 0 && path.char_at(0) == '/' {
             path = path.slice_from(1);
         }
 
@@ -207,6 +207,20 @@ fn root_router() {
     let mut router = Router::new();
     router.add("/", 10i);
     assert_eq!(*router.recognize("/").unwrap().handler, 10)
+}
+
+#[test]
+fn empty_path() {
+  let mut router = Router::new();
+  router.add("/", 12i);
+  assert_eq!(*router.recognize("").unwrap().handler, 12)
+}
+
+#[test]
+fn empty_route() {
+  let mut router = Router::new();
+  router.add("", 12i);
+  assert_eq!(*router.recognize("/").unwrap().handler, 12)
 }
 
 #[test]

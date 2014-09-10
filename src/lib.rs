@@ -141,13 +141,13 @@ impl<T> Router<T> {
         }
 
         let nfa = &self.nfa;
-        let result = nfa.process(path, |index| nfa.get(index).metadata.get_ref());
+        let result = nfa.process(path, |index| nfa.get(index).metadata.as_ref().unwrap());
 
         match result {
             Ok(nfa_match) => {
                 let mut map = Params::new();
                 let state = &nfa.get(nfa_match.state);
-                let metadata = state.metadata.get_ref();
+                let metadata = state.metadata.as_ref().unwrap();
                 let param_names = metadata.param_names.clone();
 
                 for (i, capture) in nfa_match.captures.iter().enumerate() {

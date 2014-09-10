@@ -1,10 +1,4 @@
-[project]
-
+[package]
 name = "route-recognizer"
 version = "0.1.0"
 authors = ["wycats"]
-
-[[lib]]
-
-path = "src/lib.rs"
-name = "route-recognizer"

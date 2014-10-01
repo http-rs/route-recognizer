@@ -313,7 +313,9 @@ impl<T> NFA<T> {
     }
 
     pub fn put_state(&mut self, index: uint, child: uint) {
-        self.get_mut(index).next_states.push(child);
+        if !self.states[index].next_states.contains(&child) {
+            self.get_mut(index).next_states.push(child);
+        }
     }
 
     pub fn acceptance(&mut self, index: uint) {

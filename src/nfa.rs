@@ -169,9 +169,15 @@ impl<T> PartialEq for State<T> {
 
 impl<T> State<T> {
     pub fn new(index: uint, chars: CharacterClass) -> State<T> {
-        State{ index: index, chars: chars, next_states: Vec::new(),
-        acceptance: false, start_capture: false, end_capture: false,
-        metadata: None }
+        State {
+            index: index,
+            chars: chars,
+            next_states: Vec::new(),
+            acceptance: false,
+            start_capture: false,
+            end_capture: false,
+            metadata: None,
+        }
     }
 }
 
@@ -197,8 +203,12 @@ pub struct NFA<T> {
 impl<T> NFA<T> {
     pub fn new() -> NFA<T> {
         let root = State::new(0, CharacterClass::any());
-        NFA{ states: vec![root], start_capture: vec![false],
-        end_capture: vec![false], acceptance: vec![false] }
+        NFA {
+            states: vec![root],
+            start_capture: vec![false],
+            end_capture: vec![false],
+            acceptance: vec![false],
+        }
     }
 
     pub fn process<'a, I: Ord>(&self, string: &'a str, ord: |index: uint| -> I)
@@ -216,21 +226,22 @@ impl<T> NFA<T> {
                 threads = next_threads;
             }
 
-            let mut returned = threads.move_iter().filter(|thread| {
+            let mut returned = threads.into_iter().filter(|thread| {
                 self.get(thread.state).acceptance
             });
 
             let thread = returned.max_by(|thread| ord(thread.state));
 
             match thread {
-                None => Err("The string was exhausted before reaching \
-                   an acceptance state".to_string()),
-      Some(mut thread) => {
-          if thread.capture_begin.is_some() { thread.end_capture(string.len()); }
-
-          let state = self.get(thread.state);
-          Ok(Match::new(state.index, thread.extract(string)))
-      }
+                None => Err("The string was exhausted before reaching an \
+                             acceptance state".to_string()),
+                Some(mut thread) => {
+                    if thread.capture_begin.is_some() {
+                        thread.end_capture(string.len());
+                    }
+                    let state = self.get(thread.state);
+                    Ok(Match::new(state.index, thread.extract(string)))
+                }
             }
         }
 
@@ -239,7 +250,7 @@ impl<T> NFA<T> {
                         char: char, pos: uint) -> Vec<Thread> {
         let mut returned = Vec::with_capacity(threads.len());
 
-        for mut thread in threads.move_iter() {
+        for mut thread in threads.into_iter() {
             let current_state = self.get(thread.state);
 
             let mut count = 0i;

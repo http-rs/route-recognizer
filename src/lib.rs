@@ -76,7 +76,7 @@ impl Params {
 impl Index<&'static str, String> for Params {
     fn index<'a>(&'a self, index: &&'static str) -> &'a String {
         match self.map.find(&index.to_string()) {
-            None => fail!(format!("params[{}] did not exist", index)),
+            None => panic!(format!("params[{}] did not exist", index)),
             Some(s) => s,
         }
     }

@@ -69,13 +69,13 @@ impl Params {
     }
 
     pub fn find<'a>(&'a self, key: &str) -> Option<&'a str> {
-        self.map.find_with(|k| key.cmp(&k.as_slice())).map(|s| s.as_slice())
+        self.map.find_with(|k| key.cmp(k.as_slice())).map(|s| s.as_slice())
     }
 }
 
 impl Index<&'static str, String> for Params {
     fn index<'a>(&'a self, index: &&'static str) -> &'a String {
-        match self.map.find(&index.to_string()) {
+        match self.map.get(&index.to_string()) {
             None => panic!(format!("params[{}] did not exist", index)),
             Some(s) => s,
         }
@@ -154,7 +154,7 @@ impl<T> Router<T> {
                     map.insert(param_names[i].to_string(), capture.to_string());
                 }
 
-                let handler = self.handlers.find(&nfa_match.state).unwrap();
+                let handler = self.handlers.get(&nfa_match.state).unwrap();
                 Ok(Match::new(handler, map))
             },
             Err(str) => Err(str)

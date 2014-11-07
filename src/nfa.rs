@@ -292,7 +292,7 @@ impl<T> NFA<T> {
     }
 
     pub fn get_mut<'a>(&'a mut self, state: uint) -> &'a mut State<T> {
-        self.states.get_mut(state)
+        &mut self.states[state]
     }
 
     pub fn put(&mut self, index: uint, chars: CharacterClass) -> uint {
@@ -320,17 +320,17 @@ impl<T> NFA<T> {
 
     pub fn acceptance(&mut self, index: uint) {
         self.get_mut(index).acceptance = true;
-        *self.acceptance.get_mut(index) = true;
+        self.acceptance[index] = true;
     }
 
     pub fn start_capture(&mut self, index: uint) {
         self.get_mut(index).start_capture = true;
-        *self.start_capture.get_mut(index) = true;
+        self.start_capture[index] = true;
     }
 
     pub fn end_capture(&mut self, index: uint) {
         self.get_mut(index).end_capture = true;
-        *self.end_capture.get_mut(index) = true;
+        self.end_capture[index] = true;
     }
 
     pub fn metadata(&mut self, index: uint, metadata: T) {

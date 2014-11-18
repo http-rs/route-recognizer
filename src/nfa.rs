@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::u64;
+use self::CharacterClass::{Ascii, ValidChars, InvalidChars};
 
 #[cfg(test)] use test;
 #[cfg(test)] use std::collections::TreeSet;

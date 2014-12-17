@@ -188,7 +188,7 @@ pub struct Match<'a> {
 }
 
 impl<'a> Match<'a> {
-    pub fn new<'a>(state: uint, captures: Vec<&'a str>) -> Match<'a> {
+    pub fn new<'b>(state: uint, captures: Vec<&'b str>) -> Match<'b> {
         Match{ state: state, captures: captures }
     }
 }
@@ -227,7 +227,7 @@ impl<T> NFA<T> {
                 threads = next_threads;
             }
 
-            let mut returned = threads.into_iter().filter(|thread| {
+            let returned = threads.into_iter().filter(|thread| {
                 self.get(thread.state).acceptance
             });
 

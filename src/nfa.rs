@@ -563,9 +563,9 @@ fn bench_char_set(b: &mut test::Bencher) {
     set.insert('/');
 
     b.iter(|| {
-        assert!(set.contains('p'))
+        assert!(set.contains('p'));
         assert!(set.contains('/'));
-    assert!(!set.contains('z'));
+        assert!(!set.contains('z'));
     });
 }
 

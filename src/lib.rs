@@ -2,7 +2,7 @@
 
 use nfa::NFA;
 use nfa::CharacterClass;
-use std::collections::TreeMap;
+use std::collections::BTreeMap;
 
 pub mod nfa;
 
@@ -56,12 +56,12 @@ impl Eq for Metadata {}
 
 #[deriving(PartialEq, Clone, Show)]
 pub struct Params {
-    map: TreeMap<String, String>
+    map: BTreeMap<String, String>
 }
 
 impl Params {
     pub fn new() -> Params {
-        Params{ map: TreeMap::new() }
+        Params{ map: BTreeMap::new() }
     }
 
     pub fn insert(&mut self, key: String, value: String) {
@@ -69,7 +69,7 @@ impl Params {
     }
 
     pub fn find<'a>(&'a self, key: &str) -> Option<&'a str> {
-        self.map.find_with(|k| key.cmp(k.as_slice())).map(|s| s.as_slice())
+        self.map.get(key).map(|s| s.as_slice())
     }
 }
 
@@ -96,12 +96,12 @@ impl<T> Match<T> {
 #[deriving(Clone)]
 pub struct Router<T> {
     nfa: NFA<Metadata>,
-    handlers: TreeMap<uint, T>
+    handlers: BTreeMap<uint, T>
 }
 
 impl<T> Router<T> {
     pub fn new() -> Router<T> {
-        Router{ nfa: NFA::new(), handlers: TreeMap::new() }
+        Router{ nfa: NFA::new(), handlers: BTreeMap::new() }
     }
 
     pub fn add(&mut self, mut route: &str, dest: T) {

@@ -3,6 +3,8 @@
 use nfa::NFA;
 use nfa::CharacterClass;
 use std::collections::BTreeMap;
+use std::cmp::Ordering;
+use std::ops::Index;
 
 pub mod nfa;
 
@@ -23,19 +25,19 @@ impl Metadata {
 impl Ord for Metadata {
     fn cmp(&self, other: &Metadata) -> Ordering {
         if self.stars > other.stars {
-            Less
+            Ordering::Less
         } else if self.stars < other.stars {
-            Greater
+            Ordering::Greater
         } else if self.dynamics > other.dynamics {
-            Less
+            Ordering::Less
         } else if self.dynamics < other.dynamics {
-            Greater
+            Ordering::Greater
         } else if self.statics > other.statics {
-            Less
+            Ordering::Less
         } else if self.statics < other.statics {
-            Greater
+            Ordering::Greater
         } else {
-            Equal
+            Ordering::Equal
         }
     }
 }

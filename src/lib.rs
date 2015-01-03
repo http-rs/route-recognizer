@@ -8,7 +8,7 @@ use std::ops::Index;
 
 pub mod nfa;
 
-#[deriving(Clone)]
+#[derive(Clone)]
 struct Metadata {
     statics: int,
     dynamics: int,
@@ -56,7 +56,7 @@ impl PartialEq for Metadata {
 
 impl Eq for Metadata {}
 
-#[deriving(PartialEq, Clone, Show)]
+#[derive(PartialEq, Clone, Show)]
 pub struct Params {
     map: BTreeMap<String, String>
 }
@@ -95,7 +95,7 @@ impl<T> Match<T> {
     }
 }
 
-#[deriving(Clone)]
+#[derive(Clone)]
 pub struct Router<T> {
     nfa: NFA<Metadata>,
     handlers: BTreeMap<uint, T>

@@ -3,9 +3,9 @@ use std::u64;
 use self::CharacterClass::{Ascii, ValidChars, InvalidChars};
 
 #[cfg(test)] use test;
-#[cfg(test)] use std::collections::TreeSet;
+#[cfg(test)] use std::collections::BTreeSet;
 
-#[deriving(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct CharSet {
     low_mask: u64,
     high_mask: u64,
@@ -46,7 +46,7 @@ impl CharSet {
     }
 }
 
-#[deriving(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum CharacterClass {
     Ascii(u64, u64, bool),
     ValidChars(CharSet),
@@ -123,7 +123,7 @@ impl CharacterClass {
     }
 }
 
-#[deriving(Clone)]
+#[derive(Clone)]
 struct Thread {
     state: uint,
     captures: Vec<(uint, uint)>,
@@ -151,7 +151,7 @@ impl Thread {
     }
 }
 
-#[deriving(Clone)]
+#[derive(Clone)]
 pub struct State<T> {
     pub index: uint,
     pub chars: CharacterClass,
@@ -193,7 +193,7 @@ impl<'a> Match<'a> {
     }
 }
 
-#[deriving(Clone)]
+#[derive(Clone)]
 pub struct NFA<T> {
     states: Vec<State<T>>,
     start_capture: Vec<bool>,
@@ -584,8 +584,8 @@ fn bench_hash_set(b: &mut test::Bencher) {
 }
 
 #[bench]
-fn bench_tree_set(b: &mut test::Bencher) {
-    let mut set = TreeSet::new();
+fn bench_btree_set(b: &mut test::Bencher) {
+    let mut set = BTreeSet::new();
     set.insert('p');
     set.insert('n');
     set.insert('/');
@@ -606,4 +606,3 @@ fn valid(char: char) -> CharacterClass {
 fn invalid(char: char) -> CharacterClass {
     CharacterClass::invalid_char(char)
 }
-

@@ -3,10 +3,12 @@
 use nfa::NFA;
 use nfa::CharacterClass;
 use std::collections::BTreeMap;
+use std::cmp::Ordering;
+use std::ops::Index;
 
 pub mod nfa;
 
-#[deriving(Clone)]
+#[derive(Clone)]
 struct Metadata {
     statics: int,
     dynamics: int,
@@ -23,19 +25,19 @@ impl Metadata {
 impl Ord for Metadata {
     fn cmp(&self, other: &Metadata) -> Ordering {
         if self.stars > other.stars {
-            Less
+            Ordering::Less
         } else if self.stars < other.stars {
-            Greater
+            Ordering::Greater
         } else if self.dynamics > other.dynamics {
-            Less
+            Ordering::Less
         } else if self.dynamics < other.dynamics {
-            Greater
+            Ordering::Greater
         } else if self.statics > other.statics {
-            Less
+            Ordering::Less
         } else if self.statics < other.statics {
-            Greater
+            Ordering::Greater
         } else {
-            Equal
+            Ordering::Equal
         }
     }
 }
@@ -54,7 +56,7 @@ impl PartialEq for Metadata {
 
 impl Eq for Metadata {}
 
-#[deriving(PartialEq, Clone, Show)]
+#[derive(PartialEq, Clone, Show)]
 pub struct Params {
     map: BTreeMap<String, String>
 }
@@ -93,7 +95,7 @@ impl<T> Match<T> {
     }
 }
 
-#[deriving(Clone)]
+#[derive(Clone)]
 pub struct Router<T> {
     nfa: NFA<Metadata>,
     handlers: BTreeMap<uint, T>

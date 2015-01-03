@@ -3,7 +3,7 @@ use std::u64;
 use self::CharacterClass::{Ascii, ValidChars, InvalidChars};
 
 #[cfg(test)] use test;
-#[cfg(test)] use std::collections::TreeSet;
+#[cfg(test)] use std::collections::BTreeSet;
 
 #[deriving(PartialEq, Eq, Clone)]
 pub struct CharSet {
@@ -584,8 +584,8 @@ fn bench_hash_set(b: &mut test::Bencher) {
 }
 
 #[bench]
-fn bench_tree_set(b: &mut test::Bencher) {
-    let mut set = TreeSet::new();
+fn bench_btree_set(b: &mut test::Bencher) {
+    let mut set = BTreeSet::new();
     set.insert('p');
     set.insert('n');
     set.insert('/');
@@ -606,4 +606,3 @@ fn valid(char: char) -> CharacterClass {
 fn invalid(char: char) -> CharacterClass {
     CharacterClass::invalid_char(char)
 }
-

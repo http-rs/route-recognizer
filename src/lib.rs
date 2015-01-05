@@ -1,3 +1,4 @@
+#![feature(associated_types)]
 #[cfg(test)] extern crate test;
 
 use nfa::NFA;
@@ -75,7 +76,8 @@ impl Params {
     }
 }
 
-impl Index<&'static str, String> for Params {
+impl Index<&'static str> for Params {
+    type Output = String;
     fn index<'a>(&'a self, index: &&'static str) -> &'a String {
         match self.map.get(&index.to_string()) {
             None => panic!(format!("params[{}] did not exist", index)),

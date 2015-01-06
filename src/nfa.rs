@@ -212,9 +212,10 @@ impl<T> NFA<T> {
         }
     }
 
-    pub fn process<'a, I: Ord>(&self, string: &'a str, ord: |index: uint| -> I)
-        -> Result<Match<'a>, String>
-        {
+    pub fn process<'a, I, F>(&self, string: &'a str, mut ord: F)
+                             -> Result<Match<'a>, String>
+        where I: Ord, F: FnMut(uint) -> I
+    {
             let mut threads = vec![Thread::new()];
 
             for (i, char) in string.chars().enumerate() {

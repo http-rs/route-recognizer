@@ -1,4 +1,3 @@
-#![feature(associated_types)]
 #[cfg(test)] extern crate test;
 
 use nfa::NFA;

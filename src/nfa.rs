@@ -18,7 +18,7 @@ impl CharSet {
     }
 
     pub fn insert(&mut self, char: char) {
-        let val = char as uint - 1;
+        let val = char as u32 - 1;
 
         if val > 127 {
             self.non_ascii.insert(char);
@@ -32,7 +32,7 @@ impl CharSet {
     }
 
     pub fn contains(&self, char: char) -> bool {
-        let val = char as uint - 1;
+        let val = char as u32 - 1;
 
         if val > 127 {
             self.non_ascii.contains(&char)
@@ -67,7 +67,7 @@ impl CharacterClass {
     }
 
     pub fn valid_char(char: char) -> CharacterClass {
-        let val = char as uint - 1;
+        let val = char as u32 - 1;
 
         if val > 127 {
             ValidChars(CharacterClass::char_to_set(char))
@@ -79,7 +79,7 @@ impl CharacterClass {
     }
 
     pub fn invalid_char(char: char) -> CharacterClass {
-        let val = char as uint - 1;
+        let val = char as u32 - 1;
 
         if val > 127 {
             InvalidChars(CharacterClass::char_to_set(char))
@@ -96,7 +96,7 @@ impl CharacterClass {
             ValidChars(ref valid) => valid.contains(char),
             InvalidChars(ref invalid) => !invalid.contains(char),
             Ascii(high, low, unicode) => {
-                let val = char as uint - 1;
+                let val = char as u32 - 1;
                 if val > 127 {
                     unicode
                 } else if val > 63 {
@@ -125,9 +125,9 @@ impl CharacterClass {
 
 #[derive(Clone)]
 struct Thread {
-    state: uint,
-    captures: Vec<(uint, uint)>,
-    capture_begin: Option<uint>
+    state: usize,
+    captures: Vec<(usize, usize)>,
+    capture_begin: Option<usize>
 }
 
 impl Thread {
@@ -136,12 +136,12 @@ impl Thread {
     }
 
     #[inline]
-    pub fn start_capture(&mut self, start: uint) {
+    pub fn start_capture(&mut self, start: usize) {
         self.capture_begin = Some(start);
     }
 
     #[inline]
-    pub fn end_capture(&mut self, end: uint) {
+    pub fn end_capture(&mut self, end: usize) {
         self.captures.push((self.capture_begin.unwrap(), end));
         self.capture_begin = None;
     }
@@ -153,9 +153,9 @@ impl Thread {
 
 #[derive(Clone)]
 pub struct State<T> {
-    pub index: uint,
+    pub index: usize,
     pub chars: CharacterClass,
-    pub next_states: Vec<uint>,
+    pub next_states: Vec<usize>,
     pub acceptance: bool,
     pub start_capture: bool,
     pub end_capture: bool,
@@ -169,7 +169,7 @@ impl<T> PartialEq for State<T> {
 }
 
 impl<T> State<T> {
-    pub fn new(index: uint, chars: CharacterClass) -> State<T> {
+    pub fn new(index: usize, chars: CharacterClass) -> State<T> {
         State {
             index: index,
             chars: chars,
@@ -183,12 +183,12 @@ impl<T> State<T> {
 }
 
 pub struct Match<'a> {
-    pub state: uint,
+    pub state: usize,
     pub captures: Vec<&'a str>,
 }
 
 impl<'a> Match<'a> {
-    pub fn new<'b>(state: uint, captures: Vec<&'b str>) -> Match<'b> {
+    pub fn new<'b>(state: usize, captures: Vec<&'b str>) -> Match<'b> {
         Match{ state: state, captures: captures }
     }
 }
@@ -214,7 +214,7 @@ impl<T> NFA<T> {
 
     pub fn process<'a, I, F>(&self, string: &'a str, mut ord: F)
                              -> Result<Match<'a>, String>
-        where I: Ord, F: FnMut(uint) -> I
+        where I: Ord, F: FnMut(usize) -> I
     {
             let mut threads = vec![Thread::new()];
 
@@ -249,13 +249,13 @@ impl<T> NFA<T> {
 
     #[inline]
     fn process_char<'a>(&self, threads: Vec<Thread>,
-                        char: char, pos: uint) -> Vec<Thread> {
+                        char: char, pos: usize) -> Vec<Thread> {
         let mut returned = Vec::with_capacity(threads.len());
 
         for mut thread in threads.into_iter() {
             let current_state = self.get(thread.state);
 
-            let mut count = 0i;
+            let mut count = 0;
             let mut found_state = 0;
 
             for &index in current_state.next_states.iter() {
@@ -289,15 +289,15 @@ impl<T> NFA<T> {
     }
 
     #[inline]
-    pub fn get<'a>(&'a self, state: uint) -> &'a State<T> {
+    pub fn get<'a>(&'a self, state: usize) -> &'a State<T> {
         &self.states[state]
     }
 
-    pub fn get_mut<'a>(&'a mut self, state: uint) -> &'a mut State<T> {
+    pub fn get_mut<'a>(&'a mut self, state: usize) -> &'a mut State<T> {
         &mut self.states[state]
     }
 
-    pub fn put(&mut self, index: uint, chars: CharacterClass) -> uint {
+    pub fn put(&mut self, index: usize, chars: CharacterClass) -> usize {
         {
             let state = self.get(index);
 
@@ -314,32 +314,32 @@ impl<T> NFA<T> {
         state
     }
 
-    pub fn put_state(&mut self, index: uint, child: uint) {
+    pub fn put_state(&mut self, index: usize, child: usize) {
         if !self.states[index].next_states.contains(&child) {
             self.get_mut(index).next_states.push(child);
         }
     }
 
-    pub fn acceptance(&mut self, index: uint) {
+    pub fn acceptance(&mut self, index: usize) {
         self.get_mut(index).acceptance = true;
         self.acceptance[index] = true;
     }
 
-    pub fn start_capture(&mut self, index: uint) {
+    pub fn start_capture(&mut self, index: usize) {
         self.get_mut(index).start_capture = true;
         self.start_capture[index] = true;
     }
 
-    pub fn end_capture(&mut self, index: uint) {
+    pub fn end_capture(&mut self, index: usize) {
         self.get_mut(index).end_capture = true;
         self.end_capture[index] = true;
     }
 
-    pub fn metadata(&mut self, index: uint, metadata: T) {
+    pub fn metadata(&mut self, index: usize, metadata: T) {
         self.get_mut(index).metadata = Some(metadata);
     }
 
-    fn new_state(&mut self, chars: CharacterClass) -> uint {
+    fn new_state(&mut self, chars: CharacterClass) -> usize {
         let index = self.states.len();
         let state = State::new(index, chars);
         self.states.push(state);
@@ -360,7 +360,8 @@ fn fork_thread<T>(thread: &Thread, state: &State<T>) -> Thread {
 }
 
 #[inline]
-fn capture<T>(nfa: &NFA<T>, thread: &mut Thread, current_state: uint, next_state: uint, pos: uint) {
+fn capture<T>(nfa: &NFA<T>, thread: &mut Thread, current_state: usize,
+              next_state: usize, pos: usize) {
     if thread.capture_begin == None && nfa.start_capture[next_state] {
         thread.start_capture(pos);
     }

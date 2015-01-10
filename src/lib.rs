@@ -10,9 +10,9 @@ pub mod nfa;
 
 #[derive(Clone)]
 struct Metadata {
-    statics: int,
-    dynamics: int,
-    stars: int,
+    statics: u32,
+    dynamics: u32,
+    stars: u32,
     param_names: Vec<String>,
 }
 
@@ -99,7 +99,7 @@ impl<T> Match<T> {
 #[derive(Clone)]
 pub struct Router<T> {
     nfa: NFA<Metadata>,
-    handlers: BTreeMap<uint, T>
+    handlers: BTreeMap<usize, T>
 }
 
 impl<T> Router<T> {
@@ -165,7 +165,7 @@ impl<T> Router<T> {
     }
 }
 
-fn process_static_segment<T>(segment: &str, nfa: &mut NFA<T>, mut state: uint) -> uint {
+fn process_static_segment<T>(segment: &str, nfa: &mut NFA<T>, mut state: usize) -> usize {
     for char in segment.chars() {
         state = nfa.put(state, CharacterClass::valid_char(char));
     }
@@ -173,7 +173,7 @@ fn process_static_segment<T>(segment: &str, nfa: &mut NFA<T>, mut state: uint) -
     state
 }
 
-fn process_dynamic_segment<T>(nfa: &mut NFA<T>, mut state: uint) -> uint {
+fn process_dynamic_segment<T>(nfa: &mut NFA<T>, mut state: usize) -> usize {
     state = nfa.put(state, CharacterClass::invalid_char('/'));
     nfa.put_state(state, state);
     nfa.start_capture(state);
@@ -182,7 +182,7 @@ fn process_dynamic_segment<T>(nfa: &mut NFA<T>, mut state: uint) -> uint {
     state
 }
 
-fn process_star_state<T>(nfa: &mut NFA<T>, mut state: uint) -> uint {
+fn process_star_state<T>(nfa: &mut NFA<T>, mut state: usize) -> usize {
     state = nfa.put(state, CharacterClass::any());
     nfa.put_state(state, state);
     nfa.start_capture(state);
@@ -208,21 +208,21 @@ fn basic_router() {
 #[test]
 fn root_router() {
     let mut router = Router::new();
-    router.add("/", 10i);
+    router.add("/", 10);
     assert_eq!(*router.recognize("/").unwrap().handler, 10)
 }
 
 #[test]
 fn empty_path() {
   let mut router = Router::new();
-  router.add("/", 12i);
+  router.add("/", 12);
   assert_eq!(*router.recognize("").unwrap().handler, 12)
 }
 
 #[test]
 fn empty_route() {
   let mut router = Router::new();
-  router.add("", 12i);
+  router.add("", 12);
   assert_eq!(*router.recognize("/").unwrap().handler, 12)
 }
 

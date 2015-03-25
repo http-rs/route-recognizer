@@ -1,3 +1,6 @@
+#![feature(core)]
+#![cfg_attr(test, feature(test))]
+
 #[cfg(test)] extern crate test;
 
 use nfa::NFA;
@@ -56,7 +59,7 @@ impl PartialEq for Metadata {
 
 impl Eq for Metadata {}
 
-#[derive(PartialEq, Clone, Show)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct Params {
     map: BTreeMap<String, String>
 }
@@ -70,15 +73,15 @@ impl Params {
         self.map.insert(key, value);
     }
 
-    pub fn find<'a>(&'a self, key: &str) -> Option<&'a str> {
-        self.map.get(key).map(|s| s.as_slice())
+    pub fn find(&self, key: &str) -> Option<&str> {
+        self.map.get(key).map(|s| &s[..])
     }
 }
 
-impl Index<&'static str> for Params {
+impl<'a> Index<&'a str> for Params {
     type Output = String;
-    fn index<'a>(&'a self, index: &&'static str) -> &'a String {
-        match self.map.get(&index.to_string()) {
+    fn index(&self, index: &'a str) -> &String {
+        match self.map.get(index) {
             None => panic!(format!("params[{}] did not exist", index)),
             Some(s) => s,
         }
@@ -108,8 +111,8 @@ impl<T> Router<T> {
     }
 
     pub fn add(&mut self, mut route: &str, dest: T) {
-        if route.len() != 0 && route.char_at(0) == '/' {
-            route = route.slice_from(1)
+        if route.len() != 0 && route.as_bytes()[0] == b'/' {
+            route = &route[1..];
         }
 
         let nfa = &mut self.nfa;
@@ -119,14 +122,14 @@ impl<T> Router<T> {
         for (i, segment) in route.split('/').enumerate() {
             if i > 0 { state = nfa.put(state, CharacterClass::valid_char('/')); }
 
-            if segment.len() > 0 && segment.char_at(0) == ':' {
+            if segment.len() > 0 && segment.as_bytes()[0] == b':' {
                 state = process_dynamic_segment(nfa, state);
                 metadata.dynamics += 1;
-                metadata.param_names.push(segment.slice_from(1).to_string());
-            } else if segment.len() > 0 && segment.char_at(0) == '*' {
+                metadata.param_names.push(segment[1..].to_string());
+            } else if segment.len() > 0 && segment.as_bytes()[0] == b'*' {
                 state = process_star_state(nfa, state);
                 metadata.stars += 1;
-                metadata.param_names.push(segment.slice_from(1).to_string());
+                metadata.param_names.push(segment[1..].to_string());
             } else {
                 state = process_static_segment(segment, nfa, state);
                 metadata.statics += 1;
@@ -139,8 +142,8 @@ impl<T> Router<T> {
     }
 
     pub fn recognize<'a>(&'a self, mut path: &str) -> Result<Match<&'a T>, String> {
-        if path.len() != 0 && path.char_at(0) == '/' {
-            path = path.slice_from(1);
+        if path.len() != 0 && path.as_bytes()[0] == b'/' {
+            path = &path[1..];
         }
 
         let nfa = &self.nfa;

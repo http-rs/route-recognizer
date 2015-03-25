@@ -147,7 +147,7 @@ impl Thread {
     }
 
     pub fn extract<'a>(&self, source: &'a str) -> Vec<&'a str> {
-        self.captures.iter().map(|&(begin, end)| source.slice(begin, end)).collect()
+        self.captures.iter().map(|&(begin, end)| &source[begin..end]).collect()
     }
 }
 

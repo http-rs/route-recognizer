@@ -232,7 +232,15 @@ impl<T> NFA<T> {
                 self.get(thread.state).acceptance
             });
 
-            let thread = returned.max_by(|thread| ord(thread.state));
+            let thread = returned.fold(None, |prev, y| {
+                let y_v = ord(y.state);
+                match prev {
+                    None => Some((y_v, y)),
+                    Some((x_v, x)) => {
+                        if x_v < y_v {Some((y_v, y))} else {Some((x_v, x))}
+                    }
+                }
+            }).map(|p| p.1);
 
             match thread {
                 None => Err("The string was exhausted before reaching an \

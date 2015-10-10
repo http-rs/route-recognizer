@@ -75,6 +75,10 @@ impl Params {
     pub fn find(&self, key: &str) -> Option<&str> {
         self.map.get(key).map(|s| &s[..])
     }
+    
+    pub fn keys(&self) -> Vec<&String> {
+    	self.map.keys().collect()
+    }
 }
 
 impl<'a> Index<&'a str> for Params {

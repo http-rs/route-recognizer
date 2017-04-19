@@ -275,6 +275,18 @@ fn ambiguous_router() {
 }
 
 #[test]
+fn utf8_router() {
+    let mut router = Router::new();
+
+    router.add("/고양이/:어디", "어디".to_string());
+
+    let id = router.recognize("/고양이/여기!").unwrap();
+
+    assert_eq!(*id.handler, "어디".to_string());
+    assert_eq!(id.params, params("어디", "여기!"));
+}
+
+#[test]
 fn ambiguous_router_b() {
     let mut router = Router::new();
 

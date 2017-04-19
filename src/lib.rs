@@ -5,6 +5,7 @@
 use nfa::NFA;
 use nfa::CharacterClass;
 use std::collections::BTreeMap;
+use std::collections::btree_map;
 use std::cmp::Ordering;
 use std::ops::Index;
 
@@ -75,6 +76,10 @@ impl Params {
     pub fn find(&self, key: &str) -> Option<&str> {
         self.map.get(key).map(|s| &s[..])
     }
+
+    pub fn iter<'a>(&'a self) -> Iter<'a> {
+        Iter(self.map.iter())
+    }
 }
 
 impl<'a> Index<&'a str> for Params {
@@ -84,6 +89,30 @@ impl<'a> Index<&'a str> for Params {
             None => panic!(format!("params[{}] did not exist", index)),
             Some(s) => s,
         }
+    }
+}
+
+impl<'a> IntoIterator for &'a Params {
+    type IntoIter = Iter<'a>;
+    type Item = (&'a str, &'a str);
+
+    fn into_iter(self) -> Iter<'a> {
+        self.iter()
+    }
+}
+
+pub struct Iter<'a>(btree_map::Iter<'a, String, String>);
+
+impl<'a> Iterator for Iter<'a> {
+    type Item = (&'a str, &'a str);
+
+    #[inline]
+    fn next(&mut self) -> Option<(&'a str, &'a str)> {
+        self.0.next().map(|(k, v)| (&**k, &**v))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
     }
 }
 

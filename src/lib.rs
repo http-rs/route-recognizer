@@ -327,6 +327,10 @@ fn star() {
     let m = router.recognize("/bar/foo").unwrap();
     assert_eq!(*m.handler, "test".to_string());
     assert_eq!(m.params, params("foo", "bar/foo"));
+
+    let m = router.recognize("/bar/foo/").unwrap();
+    assert_eq!(*m.handler, "test".to_string());
+    assert_eq!(m.params, params("foo", "bar/foo/"));
 }
 
 #[bench]

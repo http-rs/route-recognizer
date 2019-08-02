@@ -565,6 +565,7 @@ fn test_ascii_set() {
     assert!(!set.contains('ü'), "The set does not contain ü");
 }
 
+#[cfg(test)]
 #[bench]
 fn bench_char_set(b: &mut test::Bencher) {
     let mut set = CharSet::new();
@@ -579,6 +580,7 @@ fn bench_char_set(b: &mut test::Bencher) {
     });
 }
 
+#[cfg(test)]
 #[bench]
 fn bench_hash_set(b: &mut test::Bencher) {
     let mut set = HashSet::new();
@@ -593,6 +595,7 @@ fn bench_hash_set(b: &mut test::Bencher) {
     });
 }
 
+#[cfg(test)]
 #[bench]
 fn bench_btree_set(b: &mut test::Bencher) {
     let mut set = BTreeSet::new();

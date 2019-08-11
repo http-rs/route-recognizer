@@ -24,10 +24,10 @@ impl CharSet {
             self.non_ascii.insert(char);
         } else if val > 63 {
             let bit = 1 << (val - 64);
-            self.high_mask = self.high_mask | bit;
+            self.high_mask |= bit;
         } else {
             let bit = 1 << val;
-            self.low_mask = self.low_mask | bit;
+            self.low_mask |= bit;
         }
     }
 

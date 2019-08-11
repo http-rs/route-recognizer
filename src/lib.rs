@@ -59,7 +59,7 @@ impl PartialEq for Metadata {
 
 impl Eq for Metadata {}
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Default)]
 pub struct Params {
     map: BTreeMap<String, String>
 }
@@ -195,6 +195,13 @@ impl<T> Router<T> {
         }
     }
 }
+
+impl<T> Default for Router<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 
 fn process_static_segment<T>(segment: &str, nfa: &mut NFA<T>, mut state: usize) -> usize {
     for char in segment.chars() {

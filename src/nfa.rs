@@ -5,7 +5,7 @@ use self::CharacterClass::{Ascii, ValidChars, InvalidChars};
 #[cfg(test)] use test;
 #[cfg(test)] use std::collections::BTreeSet;
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, Default)]
 pub struct CharSet {
     low_mask: u64,
     high_mask: u64,
@@ -193,7 +193,7 @@ impl<'a> Match<'a> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct NFA<T> {
     states: Vec<State<T>>,
     start_capture: Vec<bool>,
@@ -256,7 +256,7 @@ impl<T> NFA<T> {
         }
 
     #[inline]
-    fn process_char<'a>(&self, threads: Vec<Thread>,
+    fn process_char(&self, threads: Vec<Thread>,
                         char: char, pos: usize) -> Vec<Thread> {
         let mut returned = Vec::with_capacity(threads.len());
 

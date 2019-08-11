@@ -23,7 +23,7 @@ impl CharSet {
         if val > 127 {
             self.non_ascii.insert(char);
         } else if val > 63 {
-            let bit = 1 << val - 64;
+            let bit = 1 << (val - 64);
             self.high_mask = self.high_mask | bit;
         } else {
             let bit = 1 << val;
@@ -37,7 +37,7 @@ impl CharSet {
         if val > 127 {
             self.non_ascii.contains(&char)
         } else if val > 63 {
-            let bit = 1 << val - 64;
+            let bit = 1 << (val - 64);
             self.high_mask & bit != 0
         } else {
             let bit = 1 << val;
@@ -72,7 +72,7 @@ impl CharacterClass {
         if val > 127 {
             ValidChars(CharacterClass::char_to_set(char))
         } else if val > 63 {
-            Ascii(1 << val - 64, 0, false)
+            Ascii(1 << (val - 64), 0, false)
         } else {
             Ascii(0, 1 << val, false)
         }
@@ -84,7 +84,7 @@ impl CharacterClass {
         if val > 127 {
             InvalidChars(CharacterClass::char_to_set(char))
         } else if val > 63 {
-            Ascii(u64::MAX ^ (1 << val - 64), u64::MAX, true)
+            Ascii(u64::MAX ^ (1 << (val - 64)), u64::MAX, true)
         } else {
             Ascii(u64::MAX, u64::MAX ^ (1 << val), true)
         }
@@ -171,8 +171,8 @@ impl<T> PartialEq for State<T> {
 impl<T> State<T> {
     pub fn new(index: usize, chars: CharacterClass) -> State<T> {
         State {
-            index: index,
-            chars: chars,
+            index,
+            chars,
             next_states: Vec::new(),
             acceptance: false,
             start_capture: false,
@@ -189,7 +189,7 @@ pub struct Match<'a> {
 
 impl<'a> Match<'a> {
     pub fn new<'b>(state: usize, captures: Vec<&'b str>) -> Match<'b> {
-        Match{ state: state, captures: captures }
+        Match{ state, captures }
     }
 }
 

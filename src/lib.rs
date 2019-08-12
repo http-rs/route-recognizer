@@ -87,7 +87,7 @@ impl Params {
         self.map.get(key).map(|s| &s[..])
     }
 
-    pub fn iter<'a>(&'a self) -> Iter<'a> {
+    pub fn iter(&self) -> Iter<'_> {
         Iter(self.map.iter())
     }
 }

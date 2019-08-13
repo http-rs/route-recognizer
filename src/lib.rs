@@ -195,7 +195,9 @@ impl<T> Router<T> {
                 let param_names = metadata.param_names.clone();
 
                 for (i, capture) in nfa_match.captures.iter().enumerate() {
-                    map.insert(param_names[i].to_string(), capture.to_string());
+                    if !param_names[i].is_empty() {
+                        map.insert(param_names[i].to_string(), capture.to_string());
+                    }
                 }
 
                 let handler = self.handlers.get(&nfa_match.state).unwrap();
@@ -343,6 +345,21 @@ fn star() {
     let m = router.recognize("/bar/foo").unwrap();
     assert_eq!(*m.handler, "test".to_string());
     assert_eq!(m.params, params("foo", "bar/foo"));
+}
+
+#[test]
+fn unnamed_parameters() {
+    let mut router = Router::new();
+
+    router.add("/foo/:/bar", "test".to_string());
+    router.add("/foo/:bar/*", "test2".to_string());
+    let m = router.recognize("/foo/test/bar").unwrap();
+    assert_eq!(*m.handler, "test");
+    assert_eq!(m.params, Params::new());
+
+    let m = router.recognize("/foo/test/blah").unwrap();
+    assert_eq!(*m.handler, "test2");
+    assert_eq!(m.params, params("bar", "test"));
 }
 
 #[allow(dead_code)]

@@ -2,6 +2,8 @@
 
 A simpler URL recognizer written in pure Rust
 
+[![crate-name at crates.io](https://img.shields.io/crates/v/route-recognizer.svg)](https://crates.io/crates/route-recognizer)
+[![Build Status](https://travis-ci.com/rustasync/route-recognizer.svg?branch=master)](https://travis-ci.com/rustasync/route-recognizer)
 
 ### Contribution
 

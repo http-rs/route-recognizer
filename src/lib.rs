@@ -350,6 +350,7 @@ fn star() {
     assert_eq!(m.params, params("foo", "bar/foo"));
 }
 
+#[cfg(test)]
 #[bench]
 fn benchmark(b: &mut test::Bencher) {
     let mut router = Router::new();

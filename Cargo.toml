@@ -5,5 +5,5 @@ license = "MIT/Apache-2.0"
 repository = "https://github.com/rustasync/route-recognizer"
 keywords = ["router", "url"]
 
-version = "0.1.12"
+version = "0.1.13"
 authors = ["wycats"]

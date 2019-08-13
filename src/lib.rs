@@ -1,8 +1,3 @@
-#![cfg_attr(test, feature(test))]
-
-#[cfg(test)]
-extern crate test;
-
 use nfa::CharacterClass;
 use nfa::NFA;
 use std::cmp::Ordering;
@@ -348,20 +343,6 @@ fn star() {
     let m = router.recognize("/bar/foo").unwrap();
     assert_eq!(*m.handler, "test".to_string());
     assert_eq!(m.params, params("foo", "bar/foo"));
-}
-
-#[cfg(test)]
-#[bench]
-fn benchmark(b: &mut test::Bencher) {
-    let mut router = Router::new();
-    router.add("/posts/:post_id/comments/:id", "comment".to_string());
-    router.add("/posts/:post_id/comments", "comments".to_string());
-    router.add("/posts/:post_id", "post".to_string());
-    router.add("/posts", "posts".to_string());
-    router.add("/comments", "comments2".to_string());
-    router.add("/comments/:id", "comment2".to_string());
-
-    b.iter(|| router.recognize("/posts/100/comments/200"));
 }
 
 #[allow(dead_code)]

@@ -2,11 +2,6 @@ use self::CharacterClass::{Ascii, InvalidChars, ValidChars};
 use std::collections::HashSet;
 use std::u64;
 
-#[cfg(test)]
-use std::collections::BTreeSet;
-#[cfg(test)]
-use test;
-
 #[derive(PartialEq, Eq, Clone, Default)]
 pub struct CharSet {
     low_mask: u64,
@@ -589,51 +584,6 @@ fn test_ascii_set() {
     assert!(set.contains('é'), "The set contains char 233");
     assert!(!set.contains('q'), "The set does not contain q");
     assert!(!set.contains('ü'), "The set does not contain ü");
-}
-
-#[cfg(test)]
-#[bench]
-fn bench_char_set(b: &mut test::Bencher) {
-    let mut set = CharSet::new();
-    set.insert('p');
-    set.insert('n');
-    set.insert('/');
-
-    b.iter(|| {
-        assert!(set.contains('p'));
-        assert!(set.contains('/'));
-        assert!(!set.contains('z'));
-    });
-}
-
-#[cfg(test)]
-#[bench]
-fn bench_hash_set(b: &mut test::Bencher) {
-    let mut set = HashSet::new();
-    set.insert('p');
-    set.insert('n');
-    set.insert('/');
-
-    b.iter(|| {
-        assert!(set.contains(&'p'));
-        assert!(set.contains(&'/'));
-        assert!(!set.contains(&'z'));
-    });
-}
-
-#[cfg(test)]
-#[bench]
-fn bench_btree_set(b: &mut test::Bencher) {
-    let mut set = BTreeSet::new();
-    set.insert('p');
-    set.insert('n');
-    set.insert('/');
-
-    b.iter(|| {
-        assert!(set.contains(&'p'));
-        assert!(set.contains(&'/'));
-        assert!(!set.contains(&'z'));
-    });
 }
 
 #[allow(dead_code)]

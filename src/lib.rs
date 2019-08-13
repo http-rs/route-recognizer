@@ -1,12 +1,13 @@
 #![cfg_attr(test, feature(test))]
 
-#[cfg(test)] extern crate test;
+#[cfg(test)]
+extern crate test;
 
-use nfa::NFA;
 use nfa::CharacterClass;
-use std::collections::BTreeMap;
-use std::collections::btree_map;
+use nfa::NFA;
 use std::cmp::Ordering;
+use std::collections::btree_map;
+use std::collections::BTreeMap;
 use std::ops::Index;
 
 pub mod nfa;
@@ -21,7 +22,12 @@ struct Metadata {
 
 impl Metadata {
     pub fn new() -> Metadata {
-        Metadata{ statics: 0, dynamics: 0, stars: 0, param_names: Vec::new() }
+        Metadata {
+            statics: 0,
+            dynamics: 0,
+            stars: 0,
+            param_names: Vec::new(),
+        }
     }
 }
 
@@ -53,20 +59,24 @@ impl PartialOrd for Metadata {
 
 impl PartialEq for Metadata {
     fn eq(&self, other: &Metadata) -> bool {
-        self.statics == other.statics && self.dynamics == other.dynamics && self.stars == other.stars
+        self.statics == other.statics
+            && self.dynamics == other.dynamics
+            && self.stars == other.stars
     }
 }
 
 impl Eq for Metadata {}
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Default)]
 pub struct Params {
-    map: BTreeMap<String, String>
+    map: BTreeMap<String, String>,
 }
 
 impl Params {
     pub fn new() -> Params {
-        Params{ map: BTreeMap::new() }
+        Params {
+            map: BTreeMap::new(),
+        }
     }
 
     pub fn insert(&mut self, key: String, value: String) {
@@ -77,7 +87,7 @@ impl Params {
         self.map.get(key).map(|s| &s[..])
     }
 
-    pub fn iter<'a>(&'a self) -> Iter<'a> {
+    pub fn iter(&self) -> Iter<'_> {
         Iter(self.map.iter())
     }
 }
@@ -118,28 +128,31 @@ impl<'a> Iterator for Iter<'a> {
 
 pub struct Match<T> {
     pub handler: T,
-    pub params: Params
+    pub params: Params,
 }
 
 impl<T> Match<T> {
     pub fn new(handler: T, params: Params) -> Match<T> {
-        Match{ handler: handler, params: params }
+        Match { handler, params }
     }
 }
 
 #[derive(Clone)]
 pub struct Router<T> {
     nfa: NFA<Metadata>,
-    handlers: BTreeMap<usize, T>
+    handlers: BTreeMap<usize, T>,
 }
 
 impl<T> Router<T> {
     pub fn new() -> Router<T> {
-        Router{ nfa: NFA::new(), handlers: BTreeMap::new() }
+        Router {
+            nfa: NFA::new(),
+            handlers: BTreeMap::new(),
+        }
     }
 
     pub fn add(&mut self, mut route: &str, dest: T) {
-        if route.len() != 0 && route.as_bytes()[0] == b'/' {
+        if !route.is_empty() && route.as_bytes()[0] == b'/' {
             route = &route[1..];
         }
 
@@ -148,13 +161,15 @@ impl<T> Router<T> {
         let mut metadata = Metadata::new();
 
         for (i, segment) in route.split('/').enumerate() {
-            if i > 0 { state = nfa.put(state, CharacterClass::valid_char('/')); }
+            if i > 0 {
+                state = nfa.put(state, CharacterClass::valid_char('/'));
+            }
 
-            if segment.len() > 0 && segment.as_bytes()[0] == b':' {
+            if !segment.is_empty() && segment.as_bytes()[0] == b':' {
                 state = process_dynamic_segment(nfa, state);
                 metadata.dynamics += 1;
                 metadata.param_names.push(segment[1..].to_string());
-            } else if segment.len() > 0 && segment.as_bytes()[0] == b'*' {
+            } else if !segment.is_empty() && segment.as_bytes()[0] == b'*' {
                 state = process_star_state(nfa, state);
                 metadata.stars += 1;
                 metadata.param_names.push(segment[1..].to_string());
@@ -170,7 +185,7 @@ impl<T> Router<T> {
     }
 
     pub fn recognize<'a>(&'a self, mut path: &str) -> Result<Match<&'a T>, String> {
-        if path.len() != 0 && path.as_bytes()[0] == b'/' {
+        if !path.is_empty() && path.as_bytes()[0] == b'/' {
             path = &path[1..];
         }
 
@@ -190,9 +205,15 @@ impl<T> Router<T> {
 
                 let handler = self.handlers.get(&nfa_match.state).unwrap();
                 Ok(Match::new(handler, map))
-            },
-            Err(str) => Err(str)
+            }
+            Err(str) => Err(str),
         }
+    }
+}
+
+impl<T> Default for Router<T> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -245,16 +266,16 @@ fn root_router() {
 
 #[test]
 fn empty_path() {
-  let mut router = Router::new();
-  router.add("/", 12);
-  assert_eq!(*router.recognize("").unwrap().handler, 12)
+    let mut router = Router::new();
+    router.add("/", 12);
+    assert_eq!(*router.recognize("").unwrap().handler, 12)
 }
 
 #[test]
 fn empty_route() {
-  let mut router = Router::new();
-  router.add("", 12);
-  assert_eq!(*router.recognize("/").unwrap().handler, 12)
+    let mut router = Router::new();
+    router.add("", 12);
+    assert_eq!(*router.recognize("/").unwrap().handler, 12)
 }
 
 #[test]
@@ -340,9 +361,7 @@ fn benchmark(b: &mut test::Bencher) {
     router.add("/comments", "comments2".to_string());
     router.add("/comments/:id", "comment2".to_string());
 
-    b.iter(|| {
-        router.recognize("/posts/100/comments/200")
-    });
+    b.iter(|| router.recognize("/posts/100/comments/200"));
 }
 
 #[allow(dead_code)]

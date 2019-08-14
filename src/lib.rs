@@ -124,11 +124,16 @@ impl<'a> Iterator for Iter<'a> {
 pub struct Match<T> {
     pub handler: T,
     pub params: Params,
+    pub query_string: Option<String>,
 }
 
 impl<T> Match<T> {
-    pub fn new(handler: T, params: Params) -> Match<T> {
-        Match { handler, params }
+    pub fn new(handler: T, params: Params, query_string: Option<String>) -> Match<T> {
+        Match {
+            handler,
+            params,
+            query_string,
+        }
     }
 }
 
@@ -136,6 +141,7 @@ impl<T> Match<T> {
 pub struct Router<T> {
     nfa: NFA<Metadata>,
     handlers: BTreeMap<usize, T>,
+    extract_query_string: bool,
 }
 
 impl<T> Router<T> {
@@ -143,7 +149,12 @@ impl<T> Router<T> {
         Router {
             nfa: NFA::new(),
             handlers: BTreeMap::new(),
+            extract_query_string: true,
         }
+    }
+
+    pub fn set_extract_query_string(&mut self, enable: bool) {
+        self.extract_query_string = enable
     }
 
     pub fn add(&mut self, mut route: &str, dest: T) {
@@ -179,10 +190,23 @@ impl<T> Router<T> {
         self.handlers.insert(state, dest);
     }
 
-    pub fn recognize<'a>(&'a self, mut path: &str) -> Result<Match<&'a T>, String> {
-        if !path.is_empty() && path.as_bytes()[0] == b'/' {
-            path = &path[1..];
+    pub fn recognize<'a>(&'a self, mut full_path: &str) -> Result<Match<&'a T>, String> {
+        if !full_path.is_empty() && full_path.as_bytes()[0] == b'/' {
+            full_path = &full_path[1..];
         }
+
+        let (path, query_string) = match self.extract_query_string {
+            true => {
+                let mut segments = full_path.splitn(2, '?');
+                let path = segments.next().unwrap();
+                let query_string = match segments.next() {
+                    Some(s) => Some(s.to_string()),
+                    None => None,
+                };
+                (path, query_string)
+            }
+            false => (full_path, None),
+        };
 
         let nfa = &self.nfa;
         let result = nfa.process(path, |index| nfa.get(index).metadata.as_ref().unwrap());
@@ -201,7 +225,7 @@ impl<T> Router<T> {
                 }
 
                 let handler = self.handlers.get(&nfa_match.state).unwrap();
-                Ok(Match::new(handler, map))
+                Ok(Match::new(handler, map, query_string))
             }
             Err(str) => Err(str),
         }
@@ -360,6 +384,84 @@ fn unnamed_parameters() {
     let m = router.recognize("/foo/test/blah").unwrap();
     assert_eq!(*m.handler, "test2");
     assert_eq!(m.params, params("bar", "test"));
+}
+
+#[test]
+fn strip_query_string() {
+    let mut router = Router::new();
+
+    router.add("/foo", "test".to_string());
+    router.add("/foo/:bar", "test2".to_string());
+
+    let m = router.recognize("");
+    assert_eq!(m.is_err(), true);
+
+    let m = router.recognize("/foo").unwrap();
+    assert_eq!(*m.handler, "test");
+    assert_eq!(m.params, Params::new());
+    assert_eq!(m.query_string, None);
+
+    let m = router.recognize("/foo/bleg").unwrap();
+    assert_eq!(*m.handler, "test2");
+    assert_eq!(m.params, params("bar", "bleg"));
+    assert_eq!(m.query_string, None);
+
+    let m = router.recognize("/foo?a=b").unwrap();
+    assert_eq!(*m.handler, "test");
+    assert_eq!(m.params, Params::new());
+    assert_eq!(m.query_string, Some(String::from("a=b")));
+
+    let m = router.recognize("/foo?a=b&c=????").unwrap();
+    assert_eq!(*m.handler, "test");
+    assert_eq!(m.params, Params::new());
+    assert_eq!(m.query_string, Some(String::from("a=b&c=????")));
+
+    let m = router.recognize("/foo/bleg?a=b").unwrap();
+    assert_eq!(*m.handler, "test2");
+    assert_eq!(m.params, params("bar", "bleg"));
+    assert_eq!(m.query_string, Some(String::from("a=b")));
+
+    let m = router.recognize("/foo/bleg?a=b&c=????").unwrap();
+    assert_eq!(*m.handler, "test2");
+    assert_eq!(m.params, params("bar", "bleg"));
+    assert_eq!(m.query_string, Some(String::from("a=b&c=????")));
+}
+
+#[test]
+fn disable_query_string_extraction() {
+    let mut router = Router::new();
+    router.set_extract_query_string(false);
+    router.add("/foo", "test".to_string());
+    router.add("/foo/:bar", "test2".to_string());
+
+    let m = router.recognize("");
+    assert_eq!(m.is_err(), true);
+
+    let m = router.recognize("/foo").unwrap();
+    assert_eq!(*m.handler, "test");
+    assert_eq!(m.params, Params::new());
+    assert_eq!(m.query_string, None);
+
+    let m = router.recognize("/foo/bleg").unwrap();
+    assert_eq!(*m.handler, "test2");
+    assert_eq!(m.params, params("bar", "bleg"));
+    assert_eq!(m.query_string, None);
+
+    let m = router.recognize("/foo?a=b");
+    assert_eq!(m.is_err(), true);
+
+    let m = router.recognize("/foo?a=b&c=????");
+    assert_eq!(m.is_err(), true);
+
+    let m = router.recognize("/foo/bleg?a=b").unwrap();
+    assert_eq!(*m.handler, "test2");
+    assert_eq!(m.params, params("bar", "bleg?a=b"));
+    assert_eq!(m.query_string, None);
+
+    let m = router.recognize("/foo/bleg?a=b&c=????").unwrap();
+    assert_eq!(*m.handler, "test2");
+    assert_eq!(m.params, params("bar", "bleg?a=b&c=????"));
+    assert_eq!(m.query_string, None);
 }
 
 #[allow(dead_code)]

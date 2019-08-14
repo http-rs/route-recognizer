@@ -195,17 +195,16 @@ impl<T> Router<T> {
             full_path = &full_path[1..];
         }
 
-        let (path, query_string) = match self.extract_query_string {
-            true => {
-                let mut segments = full_path.splitn(2, '?');
-                let path = segments.next().unwrap();
-                let query_string = match segments.next() {
-                    Some(s) => Some(s.to_string()),
-                    None => None,
-                };
-                (path, query_string)
-            }
-            false => (full_path, None),
+        let (path, query_string) = if self.extract_query_string {
+            let mut segments = full_path.splitn(2, '?');
+            let path = segments.next().unwrap();
+            let query_string = match segments.next() {
+                Some(s) => Some(s.to_string()),
+                None => None,
+            };
+            (path, query_string)
+        } else {
+            (full_path, None)
         };
 
         let nfa = &self.nfa;

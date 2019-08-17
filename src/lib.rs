@@ -1,5 +1,5 @@
-use nfa::CharacterClass;
-use nfa::NFA;
+use crate::nfa::CharacterClass;
+use crate::nfa::NFA;
 use std::cmp::Ordering;
 use std::collections::btree_map;
 use std::collections::BTreeMap;

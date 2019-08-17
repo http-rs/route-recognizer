@@ -28,18 +28,18 @@ impl Metadata {
 
 impl Ord for Metadata {
     fn cmp(&self, other: &Metadata) -> Ordering {
-        if self.stars > other.stars {
-            Ordering::Less
-        } else if self.stars < other.stars {
+        if self.statics > other.statics {
             Ordering::Greater
-        } else if self.dynamics > other.dynamics {
-            Ordering::Less
-        } else if self.dynamics < other.dynamics {
-            Ordering::Greater
-        } else if self.statics > other.statics {
-            Ordering::Less
         } else if self.statics < other.statics {
+            Ordering::Less
+        } else if self.dynamics > other.dynamics {
             Ordering::Greater
+        } else if self.dynamics < other.dynamics {
+            Ordering::Less
+        } else if self.stars > other.stars {
+            Ordering::Greater
+        } else if self.stars < other.stars {
+            Ordering::Less
         } else {
             Ordering::Equal
         }
@@ -343,8 +343,8 @@ fn star() {
     assert_eq!(m.params, params("foo", "foo/bar"));
 
     let m = router.recognize("/bar/foo").unwrap();
-    assert_eq!(*m.handler, "test".to_string());
-    assert_eq!(m.params, params("foo", "bar/foo"));
+    assert_eq!(*m.handler, "test2".to_string());
+    assert_eq!(m.params, params("foo", "foo"));
 }
 
 #[test]

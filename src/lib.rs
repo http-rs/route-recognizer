@@ -17,8 +17,8 @@ struct Metadata {
 }
 
 impl Metadata {
-    pub fn new() -> Metadata {
-        Metadata {
+    pub fn new() -> Self {
+        Self {
             statics: 0,
             dynamics: 0,
             stars: 0,
@@ -28,7 +28,7 @@ impl Metadata {
 }
 
 impl Ord for Metadata {
-    fn cmp(&self, other: &Metadata) -> Ordering {
+    fn cmp(&self, other: &Self) -> Ordering {
         if self.statics > other.statics {
             Ordering::Greater
         } else if self.statics < other.statics {
@@ -48,13 +48,13 @@ impl Ord for Metadata {
 }
 
 impl PartialOrd for Metadata {
-    fn partial_cmp(&self, other: &Metadata) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl PartialEq for Metadata {
-    fn eq(&self, other: &Metadata) -> bool {
+    fn eq(&self, other: &Self) -> bool {
         self.statics == other.statics
             && self.dynamics == other.dynamics
             && self.stars == other.stars
@@ -69,8 +69,8 @@ pub struct Params {
 }
 
 impl Params {
-    pub fn new() -> Params {
-        Params {
+    pub fn new() -> Self {
+        Self {
             map: BTreeMap::new(),
         }
     }
@@ -128,8 +128,8 @@ pub struct Match<T> {
 }
 
 impl<T> Match<T> {
-    pub fn new(handler: T, params: Params) -> Match<T> {
-        Match { handler, params }
+    pub fn new(handler: T, params: Params) -> Self {
+        Self { handler, params }
     }
 }
 
@@ -140,8 +140,8 @@ pub struct Router<T> {
 }
 
 impl<T> Router<T> {
-    pub fn new() -> Router<T> {
-        Router {
+    pub fn new() -> Self {
+        Self {
             nfa: NFA::new(),
             handlers: BTreeMap::new(),
         }

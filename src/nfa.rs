@@ -10,8 +10,8 @@ pub struct CharSet {
 }
 
 impl CharSet {
-    pub fn new() -> CharSet {
-        CharSet {
+    pub fn new() -> Self {
+        Self {
             low_mask: 0,
             high_mask: 0,
             non_ascii: HashSet::new(),
@@ -55,23 +55,23 @@ pub enum CharacterClass {
 }
 
 impl CharacterClass {
-    pub fn any() -> CharacterClass {
+    pub fn any() -> Self {
         Ascii(u64::MAX, u64::MAX, true)
     }
 
-    pub fn valid(string: &str) -> CharacterClass {
-        ValidChars(CharacterClass::str_to_set(string))
+    pub fn valid(string: &str) -> Self {
+        ValidChars(Self::str_to_set(string))
     }
 
-    pub fn invalid(string: &str) -> CharacterClass {
-        InvalidChars(CharacterClass::str_to_set(string))
+    pub fn invalid(string: &str) -> Self {
+        InvalidChars(Self::str_to_set(string))
     }
 
-    pub fn valid_char(char: char) -> CharacterClass {
+    pub fn valid_char(char: char) -> Self {
         let val = char as u32 - 1;
 
         if val > 127 {
-            ValidChars(CharacterClass::char_to_set(char))
+            ValidChars(Self::char_to_set(char))
         } else if val > 63 {
             Ascii(1 << (val - 64), 0, false)
         } else {
@@ -79,11 +79,11 @@ impl CharacterClass {
         }
     }
 
-    pub fn invalid_char(char: char) -> CharacterClass {
+    pub fn invalid_char(char: char) -> Self {
         let val = char as u32 - 1;
 
         if val > 127 {
-            InvalidChars(CharacterClass::char_to_set(char))
+            InvalidChars(Self::char_to_set(char))
         } else if val > 63 {
             Ascii(u64::MAX ^ (1 << (val - 64)), u64::MAX, true)
         } else {
@@ -131,8 +131,8 @@ struct Thread {
 }
 
 impl Thread {
-    pub fn new() -> Thread {
-        Thread {
+    pub fn new() -> Self {
+        Self {
             state: 0,
             captures: Vec::new(),
             capture_begin: None,
@@ -170,14 +170,14 @@ pub struct State<T> {
 }
 
 impl<T> PartialEq for State<T> {
-    fn eq(&self, other: &State<T>) -> bool {
+    fn eq(&self, other: &Self) -> bool {
         self.index == other.index
     }
 }
 
 impl<T> State<T> {
-    pub fn new(index: usize, chars: CharacterClass) -> State<T> {
-        State {
+    pub fn new(index: usize, chars: CharacterClass) -> Self {
+        Self {
             index,
             chars,
             next_states: Vec::new(),
@@ -209,9 +209,9 @@ pub struct NFA<T> {
 }
 
 impl<T> NFA<T> {
-    pub fn new() -> NFA<T> {
+    pub fn new() -> Self {
         let root = State::new(0, CharacterClass::any());
-        NFA {
+        Self {
             states: vec![root],
             start_capture: vec![false],
             end_capture: vec![false],

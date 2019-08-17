@@ -1,4 +1,4 @@
-use std::{collections::HashSet, u64};
+use std::collections::HashSet;
 
 use self::CharacterClass::{Ascii, InvalidChars, ValidChars};
 
@@ -56,7 +56,7 @@ pub enum CharacterClass {
 
 impl CharacterClass {
     pub fn any() -> Self {
-        Ascii(u64::MAX, u64::MAX, true)
+        Ascii(u64::max_value(), u64::max_value(), true)
     }
 
     pub fn valid(string: &str) -> Self {
@@ -85,9 +85,9 @@ impl CharacterClass {
         if val > 127 {
             InvalidChars(Self::char_to_set(char))
         } else if val > 63 {
-            Ascii(u64::MAX ^ (1 << (val - 64)), u64::MAX, true)
+            Ascii(u64::max_value() ^ (1 << (val - 64)), u64::max_value(), true)
         } else {
-            Ascii(u64::MAX, u64::MAX ^ (1 << val), true)
+            Ascii(u64::max_value(), u64::max_value() ^ (1 << val), true)
         }
     }
 

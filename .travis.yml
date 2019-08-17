@@ -20,3 +20,8 @@ matrix:
     - rustup component add clippy
     script:
     - cargo clippy --lib --tests -- -Dwarnings
+
+  - name: cargo +nightly bench
+    rust: nightly
+    script:
+    - cargo bench

@@ -274,13 +274,13 @@ impl<T> NFA<T> {
     fn process_char(&self, threads: Vec<Thread>, char: char, pos: usize) -> Vec<Thread> {
         let mut returned = Vec::with_capacity(threads.len());
 
-        for mut thread in threads.into_iter() {
+        for mut thread in threads {
             let current_state = self.get(thread.state);
 
             let mut count = 0;
             let mut found_state = 0;
 
-            for &index in current_state.next_states.iter() {
+            for &index in &current_state.next_states {
                 let state = &self.states[index];
 
                 if state.chars.matches(char) {
@@ -296,7 +296,7 @@ impl<T> NFA<T> {
                 continue;
             }
 
-            for &index in current_state.next_states.iter() {
+            for &index in &current_state.next_states {
                 let state = &self.states[index];
                 if state.chars.matches(char) {
                     let mut thread = fork_thread(&thread, state);
@@ -322,7 +322,7 @@ impl<T> NFA<T> {
         {
             let state = self.get(index);
 
-            for &index in state.next_states.iter() {
+            for &index in &state.next_states {
                 let state = self.get(index);
                 if state.chars == chars {
                     return index;

@@ -1,9 +1,10 @@
-use crate::nfa::CharacterClass;
-use crate::nfa::NFA;
-use std::cmp::Ordering;
-use std::collections::btree_map;
-use std::collections::BTreeMap;
-use std::ops::Index;
+use std::{
+    cmp::Ordering,
+    collections::{btree_map, BTreeMap},
+    ops::Index,
+};
+
+use crate::nfa::{CharacterClass, NFA};
 
 pub mod nfa;
 
@@ -87,9 +88,9 @@ impl Params {
     }
 }
 
-impl<'a> Index<&'a str> for Params {
+impl Index<&str> for Params {
     type Output = String;
-    fn index(&self, index: &'a str) -> &String {
+    fn index(&self, index: &str) -> &String {
         match self.map.get(index) {
             None => panic!(format!("params[{}] did not exist", index)),
             Some(s) => s,
@@ -179,7 +180,7 @@ impl<T> Router<T> {
         self.handlers.insert(state, dest);
     }
 
-    pub fn recognize<'a>(&'a self, mut path: &str) -> Result<Match<&'a T>, String> {
+    pub fn recognize(&self, mut path: &str) -> Result<Match<&T>, String> {
         if !path.is_empty() && path.as_bytes()[0] == b'/' {
             path = &path[1..];
         }

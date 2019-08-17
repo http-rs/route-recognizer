@@ -1,6 +1,6 @@
+use std::{collections::HashSet, u64};
+
 use self::CharacterClass::{Ascii, InvalidChars, ValidChars};
-use std::collections::HashSet;
-use std::u64;
 
 #[derive(PartialEq, Eq, Clone, Default)]
 pub struct CharSet {
@@ -310,11 +310,11 @@ impl<T> NFA<T> {
     }
 
     #[inline]
-    pub fn get<'a>(&'a self, state: usize) -> &'a State<T> {
+    pub fn get(&self, state: usize) -> &State<T> {
         &self.states[state]
     }
 
-    pub fn get_mut<'a>(&'a mut self, state: usize) -> &'a mut State<T> {
+    pub fn get_mut(&mut self, state: usize) -> &mut State<T> {
         &mut self.states[state]
     }
 

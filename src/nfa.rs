@@ -398,200 +398,203 @@ fn capture<T>(
     }
 }
 
-#[test]
-fn basic_test() {
-    let mut nfa = NFA::<()>::new();
-    let a = nfa.put(0, CharacterClass::valid("h"));
-    let b = nfa.put(a, CharacterClass::valid("e"));
-    let c = nfa.put(b, CharacterClass::valid("l"));
-    let d = nfa.put(c, CharacterClass::valid("l"));
-    let e = nfa.put(d, CharacterClass::valid("o"));
-    nfa.acceptance(e);
+#[cfg(test)]
+mod tests {
+    use super::{CharSet, CharacterClass, NFA};
 
-    let m = nfa.process("hello", |a| a);
+    #[test]
+    fn basic_test() {
+        let mut nfa = NFA::<()>::new();
+        let a = nfa.put(0, CharacterClass::valid("h"));
+        let b = nfa.put(a, CharacterClass::valid("e"));
+        let c = nfa.put(b, CharacterClass::valid("l"));
+        let d = nfa.put(c, CharacterClass::valid("l"));
+        let e = nfa.put(d, CharacterClass::valid("o"));
+        nfa.acceptance(e);
 
-    assert!(
-        m.unwrap().state == e,
-        "You didn't get the right final state"
-    );
-}
+        let m = nfa.process("hello", |a| a);
 
-#[test]
-fn multiple_solutions() {
-    let mut nfa = NFA::<()>::new();
-    let a1 = nfa.put(0, CharacterClass::valid("n"));
-    let b1 = nfa.put(a1, CharacterClass::valid("e"));
-    let c1 = nfa.put(b1, CharacterClass::valid("w"));
-    nfa.acceptance(c1);
+        assert!(
+            m.unwrap().state == e,
+            "You didn't get the right final state"
+        );
+    }
 
-    let a2 = nfa.put(0, CharacterClass::invalid(""));
-    let b2 = nfa.put(a2, CharacterClass::invalid(""));
-    let c2 = nfa.put(b2, CharacterClass::invalid(""));
-    nfa.acceptance(c2);
+    #[test]
+    fn multiple_solutions() {
+        let mut nfa = NFA::<()>::new();
+        let a1 = nfa.put(0, CharacterClass::valid("n"));
+        let b1 = nfa.put(a1, CharacterClass::valid("e"));
+        let c1 = nfa.put(b1, CharacterClass::valid("w"));
+        nfa.acceptance(c1);
 
-    let m = nfa.process("new", |a| a);
+        let a2 = nfa.put(0, CharacterClass::invalid(""));
+        let b2 = nfa.put(a2, CharacterClass::invalid(""));
+        let c2 = nfa.put(b2, CharacterClass::invalid(""));
+        nfa.acceptance(c2);
 
-    assert!(m.unwrap().state == c2, "The two states were not found");
-}
+        let m = nfa.process("new", |a| a);
 
-#[test]
-fn multiple_paths() {
-    let mut nfa = NFA::<()>::new();
-    let a = nfa.put(0, CharacterClass::valid("t")); // t
-    let b1 = nfa.put(a, CharacterClass::valid("h")); // th
-    let c1 = nfa.put(b1, CharacterClass::valid("o")); // tho
-    let d1 = nfa.put(c1, CharacterClass::valid("m")); // thom
-    let e1 = nfa.put(d1, CharacterClass::valid("a")); // thoma
-    let f1 = nfa.put(e1, CharacterClass::valid("s")); // thomas
+        assert!(m.unwrap().state == c2, "The two states were not found");
+    }
 
-    let b2 = nfa.put(a, CharacterClass::valid("o")); // to
-    let c2 = nfa.put(b2, CharacterClass::valid("m")); // tom
+    #[test]
+    fn multiple_paths() {
+        let mut nfa = NFA::<()>::new();
+        let a = nfa.put(0, CharacterClass::valid("t")); // t
+        let b1 = nfa.put(a, CharacterClass::valid("h")); // th
+        let c1 = nfa.put(b1, CharacterClass::valid("o")); // tho
+        let d1 = nfa.put(c1, CharacterClass::valid("m")); // thom
+        let e1 = nfa.put(d1, CharacterClass::valid("a")); // thoma
+        let f1 = nfa.put(e1, CharacterClass::valid("s")); // thomas
 
-    nfa.acceptance(f1);
-    nfa.acceptance(c2);
+        let b2 = nfa.put(a, CharacterClass::valid("o")); // to
+        let c2 = nfa.put(b2, CharacterClass::valid("m")); // tom
 
-    let thomas = nfa.process("thomas", |a| a);
-    let tom = nfa.process("tom", |a| a);
-    let thom = nfa.process("thom", |a| a);
-    let nope = nfa.process("nope", |a| a);
+        nfa.acceptance(f1);
+        nfa.acceptance(c2);
 
-    assert!(thomas.unwrap().state == f1, "thomas was parsed correctly");
-    assert!(tom.unwrap().state == c2, "tom was parsed correctly");
-    assert!(thom.is_err(), "thom didn't reach an acceptance state");
-    assert!(nope.is_err(), "nope wasn't parsed");
-}
+        let thomas = nfa.process("thomas", |a| a);
+        let tom = nfa.process("tom", |a| a);
+        let thom = nfa.process("thom", |a| a);
+        let nope = nfa.process("nope", |a| a);
 
-#[test]
-fn repetitions() {
-    let mut nfa = NFA::<()>::new();
-    let a = nfa.put(0, CharacterClass::valid("p")); // p
-    let b = nfa.put(a, CharacterClass::valid("o")); // po
-    let c = nfa.put(b, CharacterClass::valid("s")); // pos
-    let d = nfa.put(c, CharacterClass::valid("t")); // post
-    let e = nfa.put(d, CharacterClass::valid("s")); // posts
-    let f = nfa.put(e, CharacterClass::valid("/")); // posts/
-    let g = nfa.put(f, CharacterClass::invalid("/")); // posts/[^/]
-    nfa.put_state(g, g);
+        assert!(thomas.unwrap().state == f1, "thomas was parsed correctly");
+        assert!(tom.unwrap().state == c2, "tom was parsed correctly");
+        assert!(thom.is_err(), "thom didn't reach an acceptance state");
+        assert!(nope.is_err(), "nope wasn't parsed");
+    }
 
-    nfa.acceptance(g);
+    #[test]
+    fn repetitions() {
+        let mut nfa = NFA::<()>::new();
+        let a = nfa.put(0, CharacterClass::valid("p")); // p
+        let b = nfa.put(a, CharacterClass::valid("o")); // po
+        let c = nfa.put(b, CharacterClass::valid("s")); // pos
+        let d = nfa.put(c, CharacterClass::valid("t")); // post
+        let e = nfa.put(d, CharacterClass::valid("s")); // posts
+        let f = nfa.put(e, CharacterClass::valid("/")); // posts/
+        let g = nfa.put(f, CharacterClass::invalid("/")); // posts/[^/]
+        nfa.put_state(g, g);
 
-    let post = nfa.process("posts/1", |a| a);
-    let new_post = nfa.process("posts/new", |a| a);
-    let invalid = nfa.process("posts/", |a| a);
+        nfa.acceptance(g);
 
-    assert!(post.unwrap().state == g, "posts/1 was parsed");
-    assert!(new_post.unwrap().state == g, "posts/new was parsed");
-    assert!(invalid.is_err(), "posts/ was invalid");
-}
+        let post = nfa.process("posts/1", |a| a);
+        let new_post = nfa.process("posts/new", |a| a);
+        let invalid = nfa.process("posts/", |a| a);
 
-#[test]
-fn repetitions_with_ambiguous() {
-    let mut nfa = NFA::<()>::new();
-    let a = nfa.put(0, CharacterClass::valid("p")); // p
-    let b = nfa.put(a, CharacterClass::valid("o")); // po
-    let c = nfa.put(b, CharacterClass::valid("s")); // pos
-    let d = nfa.put(c, CharacterClass::valid("t")); // post
-    let e = nfa.put(d, CharacterClass::valid("s")); // posts
-    let f = nfa.put(e, CharacterClass::valid("/")); // posts/
-    let g1 = nfa.put(f, CharacterClass::invalid("/")); // posts/[^/]
-    let g2 = nfa.put(f, CharacterClass::valid("n")); // posts/n
-    let h2 = nfa.put(g2, CharacterClass::valid("e")); // posts/ne
-    let i2 = nfa.put(h2, CharacterClass::valid("w")); // posts/new
+        assert!(post.unwrap().state == g, "posts/1 was parsed");
+        assert!(new_post.unwrap().state == g, "posts/new was parsed");
+        assert!(invalid.is_err(), "posts/ was invalid");
+    }
 
-    nfa.put_state(g1, g1);
+    #[test]
+    fn repetitions_with_ambiguous() {
+        let mut nfa = NFA::<()>::new();
+        let a = nfa.put(0, CharacterClass::valid("p")); // p
+        let b = nfa.put(a, CharacterClass::valid("o")); // po
+        let c = nfa.put(b, CharacterClass::valid("s")); // pos
+        let d = nfa.put(c, CharacterClass::valid("t")); // post
+        let e = nfa.put(d, CharacterClass::valid("s")); // posts
+        let f = nfa.put(e, CharacterClass::valid("/")); // posts/
+        let g1 = nfa.put(f, CharacterClass::invalid("/")); // posts/[^/]
+        let g2 = nfa.put(f, CharacterClass::valid("n")); // posts/n
+        let h2 = nfa.put(g2, CharacterClass::valid("e")); // posts/ne
+        let i2 = nfa.put(h2, CharacterClass::valid("w")); // posts/new
 
-    nfa.acceptance(g1);
-    nfa.acceptance(i2);
+        nfa.put_state(g1, g1);
 
-    let post = nfa.process("posts/1", |a| a);
-    let ambiguous = nfa.process("posts/new", |a| a);
-    let invalid = nfa.process("posts/", |a| a);
+        nfa.acceptance(g1);
+        nfa.acceptance(i2);
 
-    assert!(post.unwrap().state == g1, "posts/1 was parsed");
-    assert!(ambiguous.unwrap().state == i2, "posts/new was ambiguous");
-    assert!(invalid.is_err(), "posts/ was invalid");
-}
+        let post = nfa.process("posts/1", |a| a);
+        let ambiguous = nfa.process("posts/new", |a| a);
+        let invalid = nfa.process("posts/", |a| a);
 
-#[test]
-fn captures() {
-    let mut nfa = NFA::<()>::new();
-    let a = nfa.put(0, CharacterClass::valid("n"));
-    let b = nfa.put(a, CharacterClass::valid("e"));
-    let c = nfa.put(b, CharacterClass::valid("w"));
+        assert!(post.unwrap().state == g1, "posts/1 was parsed");
+        assert!(ambiguous.unwrap().state == i2, "posts/new was ambiguous");
+        assert!(invalid.is_err(), "posts/ was invalid");
+    }
 
-    nfa.acceptance(c);
-    nfa.start_capture(a);
-    nfa.end_capture(c);
+    #[test]
+    fn captures() {
+        let mut nfa = NFA::<()>::new();
+        let a = nfa.put(0, CharacterClass::valid("n"));
+        let b = nfa.put(a, CharacterClass::valid("e"));
+        let c = nfa.put(b, CharacterClass::valid("w"));
 
-    let post = nfa.process("new", |a| a);
+        nfa.acceptance(c);
+        nfa.start_capture(a);
+        nfa.end_capture(c);
 
-    assert_eq!(post.unwrap().captures, vec!["new"]);
-}
+        let post = nfa.process("new", |a| a);
 
-#[test]
-fn capture_mid_match() {
-    let mut nfa = NFA::<()>::new();
-    let a = nfa.put(0, valid('p'));
-    let b = nfa.put(a, valid('/'));
-    let c = nfa.put(b, invalid('/'));
-    let d = nfa.put(c, valid('/'));
-    let e = nfa.put(d, valid('c'));
+        assert_eq!(post.unwrap().captures, vec!["new"]);
+    }
 
-    nfa.put_state(c, c);
-    nfa.acceptance(e);
-    nfa.start_capture(c);
-    nfa.end_capture(c);
+    #[test]
+    fn capture_mid_match() {
+        let mut nfa = NFA::<()>::new();
+        let a = nfa.put(0, valid('p'));
+        let b = nfa.put(a, valid('/'));
+        let c = nfa.put(b, invalid('/'));
+        let d = nfa.put(c, valid('/'));
+        let e = nfa.put(d, valid('c'));
 
-    let post = nfa.process("p/123/c", |a| a);
+        nfa.put_state(c, c);
+        nfa.acceptance(e);
+        nfa.start_capture(c);
+        nfa.end_capture(c);
 
-    assert_eq!(post.unwrap().captures, vec!["123"]);
-}
+        let post = nfa.process("p/123/c", |a| a);
 
-#[test]
-fn capture_multiple_captures() {
-    let mut nfa = NFA::<()>::new();
-    let a = nfa.put(0, valid('p'));
-    let b = nfa.put(a, valid('/'));
-    let c = nfa.put(b, invalid('/'));
-    let d = nfa.put(c, valid('/'));
-    let e = nfa.put(d, valid('c'));
-    let f = nfa.put(e, valid('/'));
-    let g = nfa.put(f, invalid('/'));
+        assert_eq!(post.unwrap().captures, vec!["123"]);
+    }
 
-    nfa.put_state(c, c);
-    nfa.put_state(g, g);
-    nfa.acceptance(g);
+    #[test]
+    fn capture_multiple_captures() {
+        let mut nfa = NFA::<()>::new();
+        let a = nfa.put(0, valid('p'));
+        let b = nfa.put(a, valid('/'));
+        let c = nfa.put(b, invalid('/'));
+        let d = nfa.put(c, valid('/'));
+        let e = nfa.put(d, valid('c'));
+        let f = nfa.put(e, valid('/'));
+        let g = nfa.put(f, invalid('/'));
 
-    nfa.start_capture(c);
-    nfa.end_capture(c);
+        nfa.put_state(c, c);
+        nfa.put_state(g, g);
+        nfa.acceptance(g);
 
-    nfa.start_capture(g);
-    nfa.end_capture(g);
+        nfa.start_capture(c);
+        nfa.end_capture(c);
 
-    let post = nfa.process("p/123/c/456", |a| a);
-    assert_eq!(post.unwrap().captures, vec!["123", "456"]);
-}
+        nfa.start_capture(g);
+        nfa.end_capture(g);
 
-#[test]
-fn test_ascii_set() {
-    let mut set = CharSet::new();
-    set.insert('?');
-    set.insert('a');
-    set.insert('é');
+        let post = nfa.process("p/123/c/456", |a| a);
+        assert_eq!(post.unwrap().captures, vec!["123", "456"]);
+    }
 
-    assert!(set.contains('?'), "The set contains char 63");
-    assert!(set.contains('a'), "The set contains char 97");
-    assert!(set.contains('é'), "The set contains char 233");
-    assert!(!set.contains('q'), "The set does not contain q");
-    assert!(!set.contains('ü'), "The set does not contain ü");
-}
+    #[test]
+    fn test_ascii_set() {
+        let mut set = CharSet::new();
+        set.insert('?');
+        set.insert('a');
+        set.insert('é');
 
-#[allow(dead_code)]
-fn valid(char: char) -> CharacterClass {
-    CharacterClass::valid_char(char)
-}
+        assert!(set.contains('?'), "The set contains char 63");
+        assert!(set.contains('a'), "The set contains char 97");
+        assert!(set.contains('é'), "The set contains char 233");
+        assert!(!set.contains('q'), "The set does not contain q");
+        assert!(!set.contains('ü'), "The set does not contain ü");
+    }
 
-#[allow(dead_code)]
-fn invalid(char: char) -> CharacterClass {
-    CharacterClass::invalid_char(char)
+    fn valid(char: char) -> CharacterClass {
+        CharacterClass::valid_char(char)
+    }
+
+    fn invalid(char: char) -> CharacterClass {
+        CharacterClass::invalid_char(char)
+    }
 }

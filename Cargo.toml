@@ -2,8 +2,8 @@
 name = "route-recognizer"
 description = "Recognizes URL patterns with support for dynamic and glob segments"
 license = "MIT"
-repository = "https://github.com/conduit-rust/route-recognizer.rs"
+repository = "https://github.com/rustasync/route-recognizer"
 keywords = ["router", "url"]
 
 version = "0.1.13"
-authors = ["wycats"]
+authors = ["wycats", "rustasync"]

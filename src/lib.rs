@@ -1,9 +1,10 @@
-use nfa::CharacterClass;
-use nfa::NFA;
-use std::cmp::Ordering;
-use std::collections::btree_map;
-use std::collections::BTreeMap;
-use std::ops::Index;
+use std::{
+    cmp::Ordering,
+    collections::{btree_map, BTreeMap},
+    ops::Index,
+};
+
+use crate::nfa::{CharacterClass, NFA};
 
 pub mod nfa;
 
@@ -16,8 +17,8 @@ struct Metadata {
 }
 
 impl Metadata {
-    pub fn new() -> Metadata {
-        Metadata {
+    pub fn new() -> Self {
+        Self {
             statics: 0,
             dynamics: 0,
             stars: 0,
@@ -27,7 +28,7 @@ impl Metadata {
 }
 
 impl Ord for Metadata {
-    fn cmp(&self, other: &Metadata) -> Ordering {
+    fn cmp(&self, other: &Self) -> Ordering {
         if self.statics > other.statics {
             Ordering::Greater
         } else if self.statics < other.statics {
@@ -47,13 +48,13 @@ impl Ord for Metadata {
 }
 
 impl PartialOrd for Metadata {
-    fn partial_cmp(&self, other: &Metadata) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl PartialEq for Metadata {
-    fn eq(&self, other: &Metadata) -> bool {
+    fn eq(&self, other: &Self) -> bool {
         self.statics == other.statics
             && self.dynamics == other.dynamics
             && self.stars == other.stars
@@ -68,8 +69,8 @@ pub struct Params {
 }
 
 impl Params {
-    pub fn new() -> Params {
-        Params {
+    pub fn new() -> Self {
+        Self {
             map: BTreeMap::new(),
         }
     }
@@ -87,9 +88,9 @@ impl Params {
     }
 }
 
-impl<'a> Index<&'a str> for Params {
+impl Index<&str> for Params {
     type Output = String;
-    fn index(&self, index: &'a str) -> &String {
+    fn index(&self, index: &str) -> &String {
         match self.map.get(index) {
             None => panic!(format!("params[{}] did not exist", index)),
             Some(s) => s,
@@ -127,8 +128,8 @@ pub struct Match<T> {
 }
 
 impl<T> Match<T> {
-    pub fn new(handler: T, params: Params) -> Match<T> {
-        Match { handler, params }
+    pub fn new(handler: T, params: Params) -> Self {
+        Self { handler, params }
     }
 }
 
@@ -139,8 +140,8 @@ pub struct Router<T> {
 }
 
 impl<T> Router<T> {
-    pub fn new() -> Router<T> {
-        Router {
+    pub fn new() -> Self {
+        Self {
             nfa: NFA::new(),
             handlers: BTreeMap::new(),
         }
@@ -179,7 +180,7 @@ impl<T> Router<T> {
         self.handlers.insert(state, dest);
     }
 
-    pub fn recognize<'a>(&'a self, mut path: &str) -> Result<Match<&'a T>, String> {
+    pub fn recognize(&self, mut path: &str) -> Result<Match<&T>, String> {
         if !path.is_empty() && path.as_bytes()[0] == b'/' {
             path = &path[1..];
         }
@@ -240,139 +241,142 @@ fn process_star_state<T>(nfa: &mut NFA<T>, mut state: usize) -> usize {
     state
 }
 
-#[test]
-fn basic_router() {
-    let mut router = Router::new();
+#[cfg(test)]
+mod tests {
+    use super::{Params, Router};
 
-    router.add("/thomas", "Thomas".to_string());
-    router.add("/tom", "Tom".to_string());
-    router.add("/wycats", "Yehuda".to_string());
+    #[test]
+    fn basic_router() {
+        let mut router = Router::new();
 
-    let m = router.recognize("/thomas").unwrap();
+        router.add("/thomas", "Thomas".to_string());
+        router.add("/tom", "Tom".to_string());
+        router.add("/wycats", "Yehuda".to_string());
 
-    assert_eq!(*m.handler, "Thomas".to_string());
-    assert_eq!(m.params, Params::new());
-}
+        let m = router.recognize("/thomas").unwrap();
 
-#[test]
-fn root_router() {
-    let mut router = Router::new();
-    router.add("/", 10);
-    assert_eq!(*router.recognize("/").unwrap().handler, 10)
-}
+        assert_eq!(*m.handler, "Thomas".to_string());
+        assert_eq!(m.params, Params::new());
+    }
 
-#[test]
-fn empty_path() {
-    let mut router = Router::new();
-    router.add("/", 12);
-    assert_eq!(*router.recognize("").unwrap().handler, 12)
-}
+    #[test]
+    fn root_router() {
+        let mut router = Router::new();
+        router.add("/", 10);
+        assert_eq!(*router.recognize("/").unwrap().handler, 10)
+    }
 
-#[test]
-fn empty_route() {
-    let mut router = Router::new();
-    router.add("", 12);
-    assert_eq!(*router.recognize("/").unwrap().handler, 12)
-}
+    #[test]
+    fn empty_path() {
+        let mut router = Router::new();
+        router.add("/", 12);
+        assert_eq!(*router.recognize("").unwrap().handler, 12)
+    }
 
-#[test]
-fn ambiguous_router() {
-    let mut router = Router::new();
+    #[test]
+    fn empty_route() {
+        let mut router = Router::new();
+        router.add("", 12);
+        assert_eq!(*router.recognize("/").unwrap().handler, 12)
+    }
 
-    router.add("/posts/new", "new".to_string());
-    router.add("/posts/:id", "id".to_string());
+    #[test]
+    fn ambiguous_router() {
+        let mut router = Router::new();
 
-    let id = router.recognize("/posts/1").unwrap();
+        router.add("/posts/new", "new".to_string());
+        router.add("/posts/:id", "id".to_string());
 
-    assert_eq!(*id.handler, "id".to_string());
-    assert_eq!(id.params, params("id", "1"));
+        let id = router.recognize("/posts/1").unwrap();
 
-    let new = router.recognize("/posts/new").unwrap();
-    assert_eq!(*new.handler, "new".to_string());
-    assert_eq!(new.params, Params::new());
-}
+        assert_eq!(*id.handler, "id".to_string());
+        assert_eq!(id.params, params("id", "1"));
 
-#[test]
-fn ambiguous_router_b() {
-    let mut router = Router::new();
+        let new = router.recognize("/posts/new").unwrap();
+        assert_eq!(*new.handler, "new".to_string());
+        assert_eq!(new.params, Params::new());
+    }
 
-    router.add("/posts/:id", "id".to_string());
-    router.add("/posts/new", "new".to_string());
+    #[test]
+    fn ambiguous_router_b() {
+        let mut router = Router::new();
 
-    let id = router.recognize("/posts/1").unwrap();
+        router.add("/posts/:id", "id".to_string());
+        router.add("/posts/new", "new".to_string());
 
-    assert_eq!(*id.handler, "id".to_string());
-    assert_eq!(id.params, params("id", "1"));
+        let id = router.recognize("/posts/1").unwrap();
 
-    let new = router.recognize("/posts/new").unwrap();
-    assert_eq!(*new.handler, "new".to_string());
-    assert_eq!(new.params, Params::new());
-}
+        assert_eq!(*id.handler, "id".to_string());
+        assert_eq!(id.params, params("id", "1"));
 
-#[test]
-fn multiple_params() {
-    let mut router = Router::new();
+        let new = router.recognize("/posts/new").unwrap();
+        assert_eq!(*new.handler, "new".to_string());
+        assert_eq!(new.params, Params::new());
+    }
 
-    router.add("/posts/:post_id/comments/:id", "comment".to_string());
-    router.add("/posts/:post_id/comments", "comments".to_string());
+    #[test]
+    fn multiple_params() {
+        let mut router = Router::new();
 
-    let com = router.recognize("/posts/12/comments/100").unwrap();
-    let coms = router.recognize("/posts/12/comments").unwrap();
+        router.add("/posts/:post_id/comments/:id", "comment".to_string());
+        router.add("/posts/:post_id/comments", "comments".to_string());
 
-    assert_eq!(*com.handler, "comment".to_string());
-    assert_eq!(com.params, two_params("post_id", "12", "id", "100"));
+        let com = router.recognize("/posts/12/comments/100").unwrap();
+        let coms = router.recognize("/posts/12/comments").unwrap();
 
-    assert_eq!(*coms.handler, "comments".to_string());
-    assert_eq!(coms.params, params("post_id", "12"));
-    assert_eq!(coms.params["post_id"], "12".to_string());
-}
+        assert_eq!(*com.handler, "comment".to_string());
+        assert_eq!(com.params, two_params("post_id", "12", "id", "100"));
 
-#[test]
-fn star() {
-    let mut router = Router::new();
+        assert_eq!(*coms.handler, "comments".to_string());
+        assert_eq!(coms.params, params("post_id", "12"));
+        assert_eq!(coms.params["post_id"], "12".to_string());
+    }
 
-    router.add("*foo", "test".to_string());
-    router.add("/bar/*foo", "test2".to_string());
+    #[test]
+    fn star() {
+        let mut router = Router::new();
 
-    let m = router.recognize("/test").unwrap();
-    assert_eq!(*m.handler, "test".to_string());
-    assert_eq!(m.params, params("foo", "test"));
+        router.add("*foo", "test".to_string());
+        router.add("/bar/*foo", "test2".to_string());
 
-    let m = router.recognize("/foo/bar").unwrap();
-    assert_eq!(*m.handler, "test".to_string());
-    assert_eq!(m.params, params("foo", "foo/bar"));
+        let m = router.recognize("/test").unwrap();
+        assert_eq!(*m.handler, "test".to_string());
+        assert_eq!(m.params, params("foo", "test"));
 
-    let m = router.recognize("/bar/foo").unwrap();
-    assert_eq!(*m.handler, "test2".to_string());
-    assert_eq!(m.params, params("foo", "foo"));
-}
+        let m = router.recognize("/foo/bar").unwrap();
+        assert_eq!(*m.handler, "test".to_string());
+        assert_eq!(m.params, params("foo", "foo/bar"));
 
-#[test]
-fn unnamed_parameters() {
-    let mut router = Router::new();
+        let m = router.recognize("/bar/foo").unwrap();
+        assert_eq!(*m.handler, "test2".to_string());
+        assert_eq!(m.params, params("foo", "foo"));
+    }
 
-    router.add("/foo/:/bar", "test".to_string());
-    router.add("/foo/:bar/*", "test2".to_string());
-    let m = router.recognize("/foo/test/bar").unwrap();
-    assert_eq!(*m.handler, "test");
-    assert_eq!(m.params, Params::new());
+    #[test]
+    fn unnamed_parameters() {
+        let mut router = Router::new();
 
-    let m = router.recognize("/foo/test/blah").unwrap();
-    assert_eq!(*m.handler, "test2");
-    assert_eq!(m.params, params("bar", "test"));
-}
+        router.add("/foo/:/bar", "test".to_string());
+        router.add("/foo/:bar/*", "test2".to_string());
+        let m = router.recognize("/foo/test/bar").unwrap();
+        assert_eq!(*m.handler, "test");
+        assert_eq!(m.params, Params::new());
 
-#[allow(dead_code)]
-fn params(key: &str, val: &str) -> Params {
-    let mut map = Params::new();
-    map.insert(key.to_string(), val.to_string());
-    map
-}
+        let m = router.recognize("/foo/test/blah").unwrap();
+        assert_eq!(*m.handler, "test2");
+        assert_eq!(m.params, params("bar", "test"));
+    }
 
-#[allow(dead_code)]
-fn two_params(k1: &str, v1: &str, k2: &str, v2: &str) -> Params {
-    let mut map = Params::new();
-    map.insert(k1.to_string(), v1.to_string());
-    map.insert(k2.to_string(), v2.to_string());
-    map
+    fn params(key: &str, val: &str) -> Params {
+        let mut map = Params::new();
+        map.insert(key.to_string(), val.to_string());
+        map
+    }
+
+    fn two_params(k1: &str, v1: &str, k2: &str, v2: &str) -> Params {
+        let mut map = Params::new();
+        map.insert(k1.to_string(), v1.to_string());
+        map.insert(k2.to_string(), v2.to_string());
+        map
+    }
 }

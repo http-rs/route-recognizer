@@ -1,20 +1,10 @@
-<<<<<<< HEAD
 use std::{
     cmp::Ordering,
-    collections::{btree_map, BTreeMap},
+    collections::{btree_map, BTreeMap, HashSet},
     ops::Index,
 };
 
 use crate::nfa::{CharacterClass, NFA};
-=======
-use nfa::CharacterClass;
-use nfa::NFA;
-use std::cmp::Ordering;
-use std::collections::btree_map;
-use std::collections::BTreeMap;
-use std::collections::HashSet;
-use std::ops::Index;
->>>>>>> Add a test after parsing a route to ensure it doesn't contain duplicate parameter names
 
 pub mod nfa;
 
@@ -157,7 +147,7 @@ impl<T> Router<T> {
         }
     }
 
-    pub fn add(&mut self, mut route: &str, dest: T) {
+    pub fn add(&mut self, mut route: &str, dest: T) -> Result<(), String> {
         if !route.is_empty() && route.as_bytes()[0] == b'/' {
             route = &route[1..];
         }
@@ -187,13 +177,18 @@ impl<T> Router<T> {
         let mut hashes = HashSet::new();
         for name in metadata.param_names.iter() {
             if !hashes.insert(name.to_string()) {
-                panic!("Duplicate name '{}' in route {}", name.to_string(), &route);
+                return Err(format!(
+                    "Duplicate name '{}' in route {}",
+                    name.to_string(),
+                    &route
+                ));
             }
         }
 
         nfa.acceptance(state);
         nfa.metadata(state, metadata);
         self.handlers.insert(state, dest);
+        Ok(())
     }
 
     pub fn recognize(&self, mut path: &str) -> Result<Match<&T>, String> {
@@ -376,7 +371,6 @@ mod tests {
         router.add("/a/*b/c", "abc".to_string());
         router.add("/a/*b/c/:d", "abcd".to_string());
 
-<<<<<<< HEAD
         let m = router.recognize("/a/foo").unwrap();
         assert_eq!(*m.handler, "ab".to_string());
         assert_eq!(m.params, params("b", "foo"));
@@ -396,49 +390,6 @@ mod tests {
         let m = router.recognize("/a/foo/c/baz").unwrap();
         assert_eq!(*m.handler, "abcd".to_string());
         assert_eq!(m.params, two_params("b", "foo", "d", "baz"));
-=======
-#[test]
-#[should_panic]
-fn duplicate_named_parameter() {
-    let mut router = Router::new();
-    router.add("/foo/:bar/:bar", "test".to_string());
-}
-
-#[test]
-#[should_panic]
-fn duplicate_star_parameter() {
-    let mut router = Router::new();
-    router.add("/foo/*bar/*bar", "test".to_string());
-}
-
-#[test]
-#[should_panic]
-fn duplicate_mixed_parameter() {
-    let mut router = Router::new();
-    router.add("/foo/*bar/:bar", "test".to_string());
-}
-
-#[test]
-#[should_panic]
-fn duplicate_mixed_reversed_parameter() {
-    let mut router = Router::new();
-    router.add("/foo/:bar/*bar", "test".to_string());
-}
-
-#[test]
-#[should_panic]
-fn duplicate_separated_parameter() {
-    let mut router = Router::new();
-    router.add("/foo/:bar/bleg/:bar", "test".to_string());
-}
-
-#[allow(dead_code)]
-fn params(key: &str, val: &str) -> Params {
-    let mut map = Params::new();
-    map.insert(key.to_string(), val.to_string());
-    map
-}
->>>>>>> Add a test after parsing a route to ensure it doesn't contain duplicate parameter names
 
         let m = router.recognize("/a/foo/bar/c/baz").unwrap();
         assert_eq!(*m.handler, "abcd".to_string());

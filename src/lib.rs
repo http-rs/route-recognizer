@@ -353,6 +353,43 @@ mod tests {
     }
 
     #[test]
+    fn star_colon() {
+        let mut router = Router::new();
+
+        router.add("/a/*b", "ab".to_string());
+        router.add("/a/*b/c", "abc".to_string());
+        router.add("/a/*b/c/:d", "abcd".to_string());
+
+        let m = router.recognize("/a/foo").unwrap();
+        assert_eq!(*m.handler, "ab".to_string());
+        assert_eq!(m.params, params("b", "foo"));
+
+        let m = router.recognize("/a/foo/bar").unwrap();
+        assert_eq!(*m.handler, "ab".to_string());
+        assert_eq!(m.params, params("b", "foo/bar"));
+
+        let m = router.recognize("/a/foo/c").unwrap();
+        assert_eq!(*m.handler, "abc".to_string());
+        assert_eq!(m.params, params("b", "foo"));
+
+        let m = router.recognize("/a/foo/bar/c").unwrap();
+        assert_eq!(*m.handler, "abc".to_string());
+        assert_eq!(m.params, params("b", "foo/bar"));
+
+        let m = router.recognize("/a/foo/c/baz").unwrap();
+        assert_eq!(*m.handler, "abcd".to_string());
+        assert_eq!(m.params, two_params("b", "foo", "d", "baz"));
+
+        let m = router.recognize("/a/foo/bar/c/baz").unwrap();
+        assert_eq!(*m.handler, "abcd".to_string());
+        assert_eq!(m.params, two_params("b", "foo/bar", "d", "baz"));
+
+        let m = router.recognize("/a/foo/bar/c/baz/bay").unwrap();
+        assert_eq!(*m.handler, "ab".to_string());
+        assert_eq!(m.params, params("b", "foo/bar/c/baz/bay"));
+    }
+
+    #[test]
     fn unnamed_parameters() {
         let mut router = Router::new();
 

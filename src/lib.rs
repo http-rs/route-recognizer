@@ -133,6 +133,177 @@ impl<T> Match<T> {
     }
 }
 
+/// A Router for defining matching rules (``routes``) for paths to a destination (``handler``).
+/// One or more routes are added to the router and then paths can be recognized and a match
+/// returned. Routes can contain parameters that are then returned as part of the match.
+///
+/// # Example
+///
+/// ```
+/// use route_recognizer::Router;
+///
+/// #[derive(PartialEq)]
+/// enum FooBarBaz {
+///     FOO,
+///     BAR,
+///     BAZ,
+/// };
+///
+/// let mut router = Router::new();
+/// router.add("/foo", FooBarBaz::FOO);
+/// router.add("/foo/:bar", FooBarBaz::BAR);
+/// router.add("/foo/:bar/*baz", FooBarBaz::BAZ);
+///
+/// let m = router.recognize("/foo").unwrap();
+/// if *m.handler == FooBarBaz::FOO {
+///   println!("do some foo");
+/// }
+///
+/// let m = router.recognize("/foo/123").unwrap();
+/// if *m.handler == FooBarBaz::BAR {
+///     println!("Got a bar of {}", m.params["bar"]);
+/// }
+///
+/// let m = router.recognize("/foo/123/abc/def").unwrap();
+/// if *m.handler == FooBarBaz::BAZ {
+///     println!("Got a bar of {} and a baz of {}", m.params["bar"], m.params["baz"]);
+/// }
+/// ```
+///
+///
+/// # Route types
+///
+/// A ``route`` consists of one or more segments, separated by a ``/``, to be matched against the ``path`` to be
+/// recognized. There are three types of segments - *static*, *dynamic*, *star*:
+///
+/// 1. *static* - a specific string to match
+///
+/// ```
+/// use route_recognizer::Router;
+/// let mut router = Router::new();
+/// router.add("/foo", "foo".to_string());
+/// router.add("/foo/bar", "foobar".to_string());
+///
+/// let m = router.recognize("/foo").unwrap();
+/// assert_eq!(*m.handler, "foo"); // foo is matched
+///
+/// let m = router.recognize("/foo/bar").unwrap();
+/// assert_eq!(*m.handler, "foobar"); // foobar is matched
+///
+/// let m = router.recognize("/foo/bar/baz");
+/// assert!(m.is_err()); // No match is found
+/// ```
+///
+/// 2. *dynamic* - a single segment is matched. Dynamic segments start with a ``:`` and can
+/// be named to be retrieved as a parameter.
+///
+/// ```
+/// use route_recognizer::Router;
+/// let mut router = Router::new();
+/// router.add("/foo/:bar", "foobar".to_string());
+/// router.add("/foo/:bar/baz", "foobarbaz".to_string());
+///
+/// let m = router.recognize("/foo");
+/// assert!(m.is_err()); // No match is found
+///
+/// let m = router.recognize("/foo/bar").unwrap();
+/// assert_eq!(*m.handler, "foobar"); // foobar is matched
+/// assert_eq!(m.params["bar"], "bar"); // parameter 'bar' is set to 'bar'
+///
+/// let m = router.recognize("/foo/123").unwrap();
+/// assert_eq!(*m.handler, "foobar"); // foobar is matched
+/// assert_eq!(m.params["bar"], "123"); // parameter 'bar' is set to '123'
+///```
+///
+/// 3. *star* - matches one or more segments until the end of the path or another
+/// defined segment is reached.
+///
+/// ```
+/// use route_recognizer::Router;
+/// let mut router = Router::new();
+/// router.add("/foo/*bar", "foobar".to_string());
+/// router.add("/foo/*bar/baz", "foobarbaz".to_string());
+///
+/// let m = router.recognize("/foo");
+/// assert!(m.is_err()); // No match is found
+///
+/// let m = router.recognize("/foo/123").unwrap();
+/// assert_eq!(*m.handler, "foobar"); // foobar is matched
+/// assert_eq!(m.params["bar"], "123"); // parameter 'bar' is set to '123'
+///
+/// let m = router.recognize("/foo/123/abc/def").unwrap();
+/// assert_eq!(*m.handler, "foobar"); // foobar is matched
+/// assert_eq!(m.params["bar"], "123/abc/def"); // parameter 'bar' is set to '123/abc/def'
+///
+/// let m = router.recognize("/foo/123/abc/baz").unwrap();
+/// assert_eq!(*m.handler, "foobarbaz"); // foobar is matched
+/// assert_eq!(m.params["bar"], "123/abc"); // parameter 'bar' is set to '123/abc'
+///```
+///
+/// # Unnamed parameters
+///
+/// Parameters do not need to have a name, but can be indicated just by the leading ``:``
+/// or ``*``. If a name is not defined then the parameter is not captured in the ``params``
+/// field of the match.
+///
+/// For example:
+///
+/// ```
+/// use route_recognizer::Router;
+/// let mut router = Router::new();
+/// router.add("/foo/*", "foo".to_string());
+/// router.add("/bar/:/baz", "barbaz".to_string());
+///
+/// let m = router.recognize("/foo/123").unwrap();
+/// assert_eq!(*m.handler, "foo"); // foo is matched
+/// assert_eq!(m.params.iter().next(), None); // but no parameters are found
+///
+/// let m = router.recognize("/bar/123/baz").unwrap();
+/// assert_eq!(*m.handler, "barbaz"); // barbaz is matched
+/// assert_eq!(m.params.iter().next(), None); // but no parameters are found
+/// ```
+///
+/// # Routing precedence
+///
+/// Routes can be a combination of all three types and the most specific match will be
+/// the result of the precedence of the types where *static* takes precedence over
+/// *dynamic*, which in turn takes precedence over *star* segments. For example, if you
+/// have the following three routes:
+///
+/// ```
+/// use route_recognizer::Router;
+/// let mut router = Router::new();
+/// router.add("/foo", "foo".to_string());
+/// router.add("/:bar", "bar".to_string());
+/// router.add("/*baz", "baz".to_string());
+///
+/// let m = router.recognize("/foo").unwrap();
+/// assert_eq!(*m.handler, "foo"); // foo is matched as it is a static match
+///
+/// let m = router.recognize("/123").unwrap();
+/// assert_eq!(*m.handler, "bar"); // bar is matched as it is a single segment match,
+///                                // whereas baz is a star match
+/// ```
+///
+/// The precedence rules also apply within a route itself. So if you have a mix of types
+/// the static and dynamic parts will take precedence over star rules. For example:
+///
+/// ```
+/// use route_recognizer::Router;
+/// let mut router = Router::new();
+/// router.add("/foo/*bar/baz/:bay", "foobarbazbay".to_string());
+///
+/// let m = router.recognize("/foo/123/abc/def/baz/xyz").unwrap();
+/// assert_eq!(m.params["bar"], "123/abc/def");
+/// assert_eq!(m.params["bay"], "xyz");
+///
+/// // note that the match will take the right most match when
+/// // a star segment is define, so in a path that contains multiple
+/// // baz segments it will match on the last one
+/// let m = router.recognize("/foo/123/baz/abc/def/baz/xyz").unwrap();
+/// assert_eq!(m.params["bar"], "123/baz/abc/def");
+/// assert_eq!(m.params["bay"], "xyz");
+/// ```
 #[derive(Clone)]
 pub struct Router<T> {
     nfa: NFA<Metadata>,
@@ -147,7 +318,49 @@ impl<T> Router<T> {
         }
     }
 
-    pub fn add(&mut self, mut route: &str, dest: T) -> Result<(), String> {
+    /// add a route to the router.
+    ///
+    /// # Examples
+    /// Basic usage:
+    /// ```
+    /// use route_recognizer::Router;
+    /// let mut router = Router::new();
+    /// router.add("/foo/*bar/baz/:bay", "foo".to_string());
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// If a duplicate name is detected in the route the function will panic to ensure that data
+    /// is not lost when a route is recognized. If the earlier parameter is not required an unamed
+    /// parameter (e.g. ``/a/:/:b`` or ``/a/*/:b``) can be used.
+    ///
+    /// If user defined data is being added as a route, consider using [`Router::add_check`] instead.
+    ///
+    /// [`Router::add_check`]: struct.Router.html#method.add_check
+    ///
+    pub fn add(&mut self, route: &str, dest: T) {
+        self.add_check(route, dest).unwrap();
+    }
+
+    /// add a route to the router returning a result indicating success or failure.
+    ///
+    /// # Examples
+    /// Basic usage:
+    /// ```
+    /// use route_recognizer::Router;
+    /// let mut router = Router::new();
+    /// router.add_check("/foo/*bar/baz/:bay", "foo".to_string()).expect("Failed to add route.");
+    /// ```
+    ///
+    /// If duplicate parameter names are defined in the route then an ``Error`` is returned:
+    /// ```
+    /// let mut router = route_recognizer::Router::new();
+    /// let result = router.add_check("/foo/:bar/abc/:bar", "foobarabcbar".to_string());
+    /// assert!(result.is_err());
+    /// assert_eq!("Duplicate name 'bar' in route foo/:bar/abc/:bar", result.err().unwrap());
+    /// ```
+    ///
+    pub fn add_check(&mut self, mut route: &str, dest: T) -> Result<(), String> {
         if !route.is_empty() && route.as_bytes()[0] == b'/' {
             route = &route[1..];
         }

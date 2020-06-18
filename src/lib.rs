@@ -139,6 +139,30 @@ pub struct Router<T> {
     handlers: BTreeMap<usize, T>,
 }
 
+fn segments(route: &str) -> Vec<(Option<char>, &str)> {
+    let predicate = |c| c == '.' || c == '/';
+
+    let mut segments = vec![];
+    let mut segment_start = 0;
+
+    while segment_start < route.len() {
+        let segment_end = route[segment_start + 1..]
+            .find(predicate)
+            .map(|i| i + segment_start + 1)
+            .unwrap_or_else(|| route.len());
+        let potential_sep = route.chars().nth(segment_start);
+        let sep_and_segment = match potential_sep {
+            Some(sep) if predicate(sep) => (Some(sep), &route[segment_start + 1..segment_end]),
+            _ => (None, &route[segment_start..segment_end]),
+        };
+
+        segments.push(sep_and_segment);
+        segment_start = segment_end;
+    }
+
+    segments
+}
+
 impl<T> Router<T> {
     pub fn new() -> Self {
         Self {
@@ -156,9 +180,9 @@ impl<T> Router<T> {
         let mut state = 0;
         let mut metadata = Metadata::new();
 
-        for (i, segment) in route.split('/').enumerate() {
-            if i > 0 {
-                state = nfa.put(state, CharacterClass::valid_char('/'));
+        for (separator, segment) in segments(route) {
+            if let Some(separator) = separator {
+                state = nfa.put(state, CharacterClass::valid_char(separator));
             }
 
             if !segment.is_empty() && segment.as_bytes()[0] == b':' {
@@ -415,5 +439,38 @@ mod tests {
         map.insert(k1.to_string(), v1.to_string());
         map.insert(k2.to_string(), v2.to_string());
         map
+    }
+
+    #[test]
+    fn dot() {
+        let mut router = Router::new();
+        router.add("/1/baz.:wibble", ());
+        router.add("/2/:bar.baz", ());
+        router.add("/3/:dynamic.:extension", ());
+        router.add("/4/static.static", ());
+
+        let m = router.recognize("/1/baz.jpg").unwrap();
+        assert_eq!(m.params, params("wibble", "jpg"));
+
+        let m = router.recognize("/2/test.baz").unwrap();
+        assert_eq!(m.params, params("bar", "test"));
+
+        let m = router.recognize("/3/any.thing").unwrap();
+        assert_eq!(m.params, two_params("dynamic", "any", "extension", "thing"));
+
+        let m = router.recognize("/3/this.performs.a.greedy.match").unwrap();
+        assert_eq!(
+            m.params,
+            two_params("dynamic", "this.performs.a.greedy", "extension", "match")
+        );
+
+        let m = router.recognize("/4/static.static").unwrap();
+        assert_eq!(m.params, Params::new());
+
+        let m = router.recognize("/4/static/static");
+        assert!(m.is_err());
+
+        let m = router.recognize("/4.static.static");
+        assert!(m.is_err());
     }
 }

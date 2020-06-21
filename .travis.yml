@@ -15,12 +15,6 @@ matrix:
     script:
     - cargo fmt --all -- --check
 
-  - name: cargo clippy
-    install:
-    - rustup component add clippy
-    script:
-    - cargo clippy --lib --tests -- -Dwarnings
-
   - name: cargo +nightly bench
     rust: nightly
     script:

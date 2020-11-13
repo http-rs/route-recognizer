@@ -196,7 +196,7 @@ pub struct Match<'a> {
 }
 
 impl<'a> Match<'a> {
-    pub fn new<'b>(state: usize, captures: Vec<&'b str>) -> Match<'b> {
+    pub fn new(state: usize, captures: Vec<&'_ str>) -> Match<'_> {
         Match { state, captures }
     }
 }

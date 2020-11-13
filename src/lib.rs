@@ -13,8 +13,8 @@
 //!
 //! let m = router.recognize("/thomas").unwrap();
 //!
-//! assert_eq!(*m.handler, "Thomas".to_string());
-//! assert_eq!(m.params, Params::new());
+//! assert_eq!(m.handler().as_str(), "Thomas");
+//! assert_eq!(m.params(), &Params::new());
 //! ```
 //!
 //! # Routing params
@@ -178,9 +178,9 @@ impl<'a> Iterator for Iter<'a> {
 #[derive(Debug)]
 pub struct Match<T> {
     /// Return the endpoint handler.
-    pub handler: T,
+    handler: T,
     /// Return the params.
-    pub params: Params,
+    params: Params,
 }
 
 impl<T> Match<T> {
@@ -188,9 +188,29 @@ impl<T> Match<T> {
     pub fn new(handler: T, params: Params) -> Self {
         Self { handler, params }
     }
+
+    /// Get a handle to the handler.
+    pub fn handler(&self) -> &T {
+        &self.handler
+    }
+
+    /// Get a mutable handle to the handler.
+    pub fn handler_mut(&mut self) -> &mut T {
+        &mut self.handler
+    }
+
+    /// Get a handle to the params.
+    pub fn params(&self) -> &Params {
+        &self.params
+    }
+
+    /// Get a mutable handle to the params.
+    pub fn params_mut(&mut self) -> &mut Params {
+        &mut self.params
+    }
 }
 
-/// Recognizes URL patterns with support for dynamic and glob segments.
+/// Recognizes URL patterns with support for dynamic and wildcard segments.
 #[derive(Clone, Debug)]
 pub struct Router<T> {
     nfa: NFA<Metadata>,
@@ -231,7 +251,6 @@ impl<T> Router<T> {
     }
 
     /// Add a route to the router.
-
     pub fn add(&mut self, mut route: &str, dest: T) {
         if !route.is_empty() && route.as_bytes()[0] == b'/' {
             route = &route[1..];

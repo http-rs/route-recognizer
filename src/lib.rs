@@ -20,7 +20,7 @@
 //! # Routing params
 //!
 //! The router supports four kinds of route segments:
-//! - __static segments__: these are of the format `/a/b`.
+//! - __static params: these are segments of the format `/a/b`.
 //! - __named params__: these are segments of the format `/a/:b`.
 //! - __named wildcards__: these are segments of the format `/a/*b`.
 //! - __unnamed wildcards__: these are segments of the format `/a/*`.
@@ -63,7 +63,7 @@ struct Metadata {
 }
 
 impl Metadata {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             statics: 0,
             dynamics: 0,
@@ -114,20 +114,26 @@ pub struct Params {
 }
 
 impl Params {
+    /// Create a new instance of `Params`.
     pub fn new() -> Self {
         Self {
             map: BTreeMap::new(),
         }
     }
 
+    /// Insert a new param into `Params`.
     pub fn insert(&mut self, key: String, value: String) {
         self.map.insert(key, value);
     }
 
+    /// Find a param by name in `Params`.
     pub fn find(&self, key: &str) -> Option<&str> {
         self.map.get(key).map(|s| &s[..])
     }
 
+    /// Iterate over all named params.
+    ///
+    /// This will return all named params and named wildcards.
     pub fn iter(&self) -> Iter<'_> {
         Iter(self.map.iter())
     }
@@ -172,11 +178,14 @@ impl<'a> Iterator for Iter<'a> {
 /// The result of a successful match returned by `Router::recognize`.
 #[derive(Debug)]
 pub struct Match<T> {
+    /// Return the endpoint handler.
     pub handler: T,
+    /// Return the params.
     pub params: Params,
 }
 
 impl<T> Match<T> {
+    /// Create a new instance of `Match`.
     pub fn new(handler: T, params: Params) -> Self {
         Self { handler, params }
     }
@@ -214,6 +223,7 @@ fn segments(route: &str) -> Vec<(Option<char>, &str)> {
 }
 
 impl<T> Router<T> {
+    /// Create a new instance of `Router`.
     pub fn new() -> Self {
         Self {
             nfa: NFA::new(),
@@ -256,6 +266,7 @@ impl<T> Router<T> {
         self.handlers.insert(state, dest);
     }
 
+    /// Match a route on the router.
     pub fn recognize(&self, mut path: &str) -> Result<Match<&T>, String> {
         if !path.is_empty() && path.as_bytes()[0] == b'/' {
             path = &path[1..];

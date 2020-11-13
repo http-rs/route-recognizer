@@ -131,7 +131,7 @@ struct Thread {
 }
 
 impl Thread {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             state: 0,
             captures: Vec::new(),
@@ -140,17 +140,17 @@ impl Thread {
     }
 
     #[inline]
-    pub fn start_capture(&mut self, start: usize) {
+    pub(crate) fn start_capture(&mut self, start: usize) {
         self.capture_begin = Some(start);
     }
 
     #[inline]
-    pub fn end_capture(&mut self, end: usize) {
+    pub(crate) fn end_capture(&mut self, end: usize) {
         self.captures.push((self.capture_begin.unwrap(), end));
         self.capture_begin = None;
     }
 
-    pub fn extract<'a>(&self, source: &'a str) -> Vec<&'a str> {
+    pub(crate) fn extract<'a>(&self, source: &'a str) -> Vec<&'a str> {
         self.captures
             .iter()
             .map(|&(begin, end)| &source[begin..end])

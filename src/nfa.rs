@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use self::CharacterClass::{Ascii, InvalidChars, ValidChars};
 
-#[derive(PartialEq, Eq, Clone, Default)]
+#[derive(PartialEq, Eq, Clone, Default, Debug)]
 pub struct CharSet {
     low_mask: u64,
     high_mask: u64,
@@ -47,7 +47,7 @@ impl CharSet {
     }
 }
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum CharacterClass {
     Ascii(u64, u64, bool),
     ValidChars(CharSet),
@@ -158,7 +158,7 @@ impl Thread {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct State<T> {
     pub index: usize,
     pub chars: CharacterClass,
@@ -189,6 +189,7 @@ impl<T> State<T> {
     }
 }
 
+#[derive(Debug)]
 pub struct Match<'a> {
     pub state: usize,
     pub captures: Vec<&'a str>,
@@ -200,7 +201,7 @@ impl<'a> Match<'a> {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct NFA<T> {
     states: Vec<State<T>>,
     start_capture: Vec<bool>,

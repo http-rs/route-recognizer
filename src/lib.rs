@@ -1,14 +1,60 @@
-use std::{
-    cmp::Ordering,
-    collections::{btree_map, BTreeMap},
-    ops::Index,
-};
+//! Recognizes URL patterns with support for dynamic and glob segments
+//!
+//! # Examples
+//!
+//! ```
+//! use route_recognizer::{Router, Params};
+//!
+//! let mut router = Router::new();
+//!
+//! router.add("/thomas", "Thomas".to_string());
+//! router.add("/tom", "Tom".to_string());
+//! router.add("/wycats", "Yehuda".to_string());
+//!
+//! let m = router.recognize("/thomas").unwrap();
+//!
+//! assert_eq!(*m.handler, "Thomas".to_string());
+//! assert_eq!(m.params, Params::new());
+//! ```
+//!
+//! # Routing params
+//!
+//! The router supports four kinds of route segments:
+//! - __static segments__: these are of the format `/a/b`.
+//! - __named params__: these are segments of the format `/a/:b`.
+//! - __named wildcards__: these are segments of the format `/a/*b`.
+//! - __unnamed wildcards__: these are segments of the format `/a/*`.
+//!
+//! The difference between a "wildcard" and a "named param" is how the
+//! matching rules apply. Given the router `/a/:b`, passing in `/foo/bar/baz`
+//! will not match because `/baz` has no counterpart in the router.
+//!
+//! However if we define the route `/a/*b` and we pass `/foo/bar/baz` we end up
+//! with a named param `"b"` that contains the value `"bar/baz"`. Wildcard
+//! routing rules are useful when you don't know which routes may follow.
+//!
+//! The difference between "named" and "unnamed" wildcards is that the former
+//! will show up in `Params`, while the latter won't.
+
+#![cfg_attr(feature = "docs", feature(doc_cfg))]
+#![forbid(unsafe_code)]
+#![deny(missing_debug_implementations, nonstandard_style)]
+#![warn(missing_docs, unreachable_pub, future_incompatible, rust_2018_idioms)]
+#![doc(test(attr(deny(warnings))))]
+#![doc(test(attr(allow(unused_extern_crates, unused_variables))))]
+#![doc(html_favicon_url = "https://yoshuawuyts.com/assets/http-rs/favicon.ico")]
+#![doc(html_logo_url = "https://yoshuawuyts.com/assets/http-rs/logo-rounded.png")]
+
+use std::cmp::Ordering;
+use std::collections::{btree_map, BTreeMap};
+use std::ops::Index;
 
 use crate::nfa::{CharacterClass, NFA};
 
+#[doc(hidden)]
 pub mod nfa;
 
-#[derive(Clone)]
+#[derive(Clone, Eq, Debug)]
 struct Metadata {
     statics: u32,
     dynamics: u32,
@@ -61,8 +107,7 @@ impl PartialEq for Metadata {
     }
 }
 
-impl Eq for Metadata {}
-
+/// Router parameters.
 #[derive(PartialEq, Clone, Debug, Default)]
 pub struct Params {
     map: BTreeMap<String, String>,
@@ -107,6 +152,8 @@ impl<'a> IntoIterator for &'a Params {
     }
 }
 
+/// An iterator over `Params`.
+#[derive(Debug)]
 pub struct Iter<'a>(btree_map::Iter<'a, String, String>);
 
 impl<'a> Iterator for Iter<'a> {
@@ -122,6 +169,8 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
+/// The result of a successful match returned by `Router::recognize`.
+#[derive(Debug)]
 pub struct Match<T> {
     pub handler: T,
     pub params: Params,
@@ -133,7 +182,8 @@ impl<T> Match<T> {
     }
 }
 
-#[derive(Clone)]
+/// Recognizes URL patterns with support for dynamic and glob segments.
+#[derive(Clone, Debug)]
 pub struct Router<T> {
     nfa: NFA<Metadata>,
     handlers: BTreeMap<usize, T>,
@@ -170,6 +220,8 @@ impl<T> Router<T> {
             handlers: BTreeMap::new(),
         }
     }
+
+    /// Add a route to the router.
 
     pub fn add(&mut self, mut route: &str, dest: T) {
         if !route.is_empty() && route.as_bytes()[0] == b'/' {

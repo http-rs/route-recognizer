@@ -1,4 +1,4 @@
-//! Recognizes URL patterns with support for dynamic and glob segments
+//! Recognizes URL patterns with support for dynamic and wildcard segments
 //!
 //! # Examples
 //!
@@ -57,7 +57,7 @@ pub mod nfa;
 struct Metadata {
     statics: u32,
     dynamics: u32,
-    stars: u32,
+    wildcards: u32,
     param_names: Vec<String>,
 }
 
@@ -66,7 +66,7 @@ impl Metadata {
         Self {
             statics: 0,
             dynamics: 0,
-            stars: 0,
+            wildcards: 0,
             param_names: Vec::new(),
         }
     }
@@ -82,9 +82,9 @@ impl Ord for Metadata {
             Ordering::Greater
         } else if self.dynamics < other.dynamics {
             Ordering::Less
-        } else if self.stars > other.stars {
+        } else if self.wildcards > other.wildcards {
             Ordering::Greater
-        } else if self.stars < other.stars {
+        } else if self.wildcards < other.wildcards {
             Ordering::Less
         } else {
             Ordering::Equal
@@ -102,7 +102,7 @@ impl PartialEq for Metadata {
     fn eq(&self, other: &Self) -> bool {
         self.statics == other.statics
             && self.dynamics == other.dynamics
-            && self.stars == other.stars
+            && self.wildcards == other.wildcards
     }
 }
 
@@ -271,7 +271,7 @@ impl<T> Router<T> {
                 metadata.param_names.push(segment[1..].to_string());
             } else if !segment.is_empty() && segment.as_bytes()[0] == b'*' {
                 state = process_star_state(nfa, state);
-                metadata.stars += 1;
+                metadata.wildcards += 1;
                 metadata.param_names.push(segment[1..].to_string());
             } else {
                 state = process_static_segment(segment, nfa, state);
@@ -438,7 +438,7 @@ mod tests {
     }
 
     #[test]
-    fn star() {
+    fn wildcard() {
         let mut router = Router::new();
 
         router.add("*foo", "test".to_string());
@@ -458,7 +458,7 @@ mod tests {
     }
 
     #[test]
-    fn star_colon() {
+    fn wildcard_colon() {
         let mut router = Router::new();
 
         router.add("/a/*b", "ab".to_string());

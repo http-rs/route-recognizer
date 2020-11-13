@@ -1,7 +1,7 @@
 <h1 align="center">route-recognizer</h1>
 <div align="center">
   <strong>
-    Recognizes URL patterns with support for dynamic and glob segments
+    Recognizes URL patterns with support for dynamic and wildcard segments
   </strong>
 </div>
 

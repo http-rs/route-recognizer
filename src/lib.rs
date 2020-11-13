@@ -20,21 +20,20 @@
 //! # Routing params
 //!
 //! The router supports four kinds of route segments:
-//! - __static params: these are segments of the format `/a/b`.
-//! - __named params__: these are segments of the format `/a/:b`.
-//! - __named wildcards__: these are segments of the format `/a/*b`.
-//! - __unnamed wildcards__: these are segments of the format `/a/*`.
+//! - __segments__: these are of the format `/a/b`.
+//! - __params__: these are of the format `/a/:b`.
+//! - __named wildcards__: these are of the format `/a/*b`.
+//! - __unnamed wildcards__: these are of the format `/a/*`.
 //!
-//! The difference between a "wildcard" and a "named param" is how the
+//! The difference between a "named wildcard" and a "param" is how the
 //! matching rules apply. Given the router `/a/:b`, passing in `/foo/bar/baz`
 //! will not match because `/baz` has no counterpart in the router.
 //!
 //! However if we define the route `/a/*b` and we pass `/foo/bar/baz` we end up
 //! with a named param `"b"` that contains the value `"bar/baz"`. Wildcard
-//! routing rules are useful when you don't know which routes may follow.
-//!
-//! The difference between "named" and "unnamed" wildcards is that the former
-//! will show up in `Params`, while the latter won't.
+//! routing rules are useful when you don't know which routes may follow. The
+//! difference between "named" and "unnamed" wildcards is that the former will
+//! show up in `Params`, while the latter won't.
 
 #![cfg_attr(feature = "docs", feature(doc_cfg))]
 #![forbid(unsafe_code)]

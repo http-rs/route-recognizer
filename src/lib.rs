@@ -36,7 +36,7 @@
 //! show up in `Params`, while the latter won't.
 
 #![cfg_attr(feature = "docs", feature(doc_cfg))]
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 #![deny(missing_debug_implementations, nonstandard_style)]
 #![warn(missing_docs, unreachable_pub, future_incompatible, rust_2018_idioms)]
 #![doc(test(attr(deny(warnings))))]

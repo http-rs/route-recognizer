@@ -1,6 +1,6 @@
 [package]
 name = "route-recognizer"
-description = "Recognizes URL patterns with support for dynamic and glob segments"
+description = "Recognizes URL patterns with support for dynamic and wildcard segments"
 license = "MIT"
 repository = "https://github.com/rustasync/route-recognizer"
 keywords = ["router", "url"]

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use self::CharacterClass::{Ascii, InvalidChars, ValidChars};
 
-#[derive(PartialEq, Eq, Clone, Default)]
+#[derive(PartialEq, Eq, Clone, Default, Debug)]
 pub struct CharSet {
     low_mask: u64,
     high_mask: u64,
@@ -47,7 +47,7 @@ impl CharSet {
     }
 }
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum CharacterClass {
     Ascii(u64, u64, bool),
     ValidChars(CharSet),
@@ -131,7 +131,7 @@ struct Thread {
 }
 
 impl Thread {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             state: 0,
             captures: Vec::new(),
@@ -140,17 +140,17 @@ impl Thread {
     }
 
     #[inline]
-    pub fn start_capture(&mut self, start: usize) {
+    pub(crate) fn start_capture(&mut self, start: usize) {
         self.capture_begin = Some(start);
     }
 
     #[inline]
-    pub fn end_capture(&mut self, end: usize) {
+    pub(crate) fn end_capture(&mut self, end: usize) {
         self.captures.push((self.capture_begin.unwrap(), end));
         self.capture_begin = None;
     }
 
-    pub fn extract<'a>(&self, source: &'a str) -> Vec<&'a str> {
+    pub(crate) fn extract<'a>(&self, source: &'a str) -> Vec<&'a str> {
         self.captures
             .iter()
             .map(|&(begin, end)| &source[begin..end])
@@ -158,7 +158,7 @@ impl Thread {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct State<T> {
     pub index: usize,
     pub chars: CharacterClass,
@@ -189,18 +189,19 @@ impl<T> State<T> {
     }
 }
 
+#[derive(Debug)]
 pub struct Match<'a> {
     pub state: usize,
     pub captures: Vec<&'a str>,
 }
 
 impl<'a> Match<'a> {
-    pub fn new<'b>(state: usize, captures: Vec<&'b str>) -> Match<'b> {
+    pub fn new(state: usize, captures: Vec<&'_ str>) -> Match<'_> {
         Match { state, captures }
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct NFA<T> {
     states: Vec<State<T>>,
     start_capture: Vec<bool>,

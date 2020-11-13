@@ -1,27 +1,72 @@
-use std::{
-    cmp::Ordering,
-    collections::{btree_map, BTreeMap},
-    ops::Index,
-};
+//! Recognizes URL patterns with support for dynamic and wildcard segments
+//!
+//! # Examples
+//!
+//! ```
+//! use route_recognizer::{Router, Params};
+//!
+//! let mut router = Router::new();
+//!
+//! router.add("/thomas", "Thomas".to_string());
+//! router.add("/tom", "Tom".to_string());
+//! router.add("/wycats", "Yehuda".to_string());
+//!
+//! let m = router.recognize("/thomas").unwrap();
+//!
+//! assert_eq!(m.handler().as_str(), "Thomas");
+//! assert_eq!(m.params(), &Params::new());
+//! ```
+//!
+//! # Routing params
+//!
+//! The router supports four kinds of route segments:
+//! - __segments__: these are of the format `/a/b`.
+//! - __params__: these are of the format `/a/:b`.
+//! - __named wildcards__: these are of the format `/a/*b`.
+//! - __unnamed wildcards__: these are of the format `/a/*`.
+//!
+//! The difference between a "named wildcard" and a "param" is how the
+//! matching rules apply. Given the router `/a/:b`, passing in `/foo/bar/baz`
+//! will not match because `/baz` has no counterpart in the router.
+//!
+//! However if we define the route `/a/*b` and we pass `/foo/bar/baz` we end up
+//! with a named param `"b"` that contains the value `"bar/baz"`. Wildcard
+//! routing rules are useful when you don't know which routes may follow. The
+//! difference between "named" and "unnamed" wildcards is that the former will
+//! show up in `Params`, while the latter won't.
+
+#![cfg_attr(feature = "docs", feature(doc_cfg))]
+#![deny(unsafe_code)]
+#![deny(missing_debug_implementations, nonstandard_style)]
+#![warn(missing_docs, unreachable_pub, future_incompatible, rust_2018_idioms)]
+#![doc(test(attr(deny(warnings))))]
+#![doc(test(attr(allow(unused_extern_crates, unused_variables))))]
+#![doc(html_favicon_url = "https://yoshuawuyts.com/assets/http-rs/favicon.ico")]
+#![doc(html_logo_url = "https://yoshuawuyts.com/assets/http-rs/logo-rounded.png")]
+
+use std::cmp::Ordering;
+use std::collections::{btree_map, BTreeMap};
+use std::ops::Index;
 
 use crate::nfa::{CharacterClass, NFA};
 
+#[doc(hidden)]
 pub mod nfa;
 
-#[derive(Clone)]
+#[derive(Clone, Eq, Debug)]
 struct Metadata {
     statics: u32,
     dynamics: u32,
-    stars: u32,
+    wildcards: u32,
     param_names: Vec<String>,
 }
 
 impl Metadata {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             statics: 0,
             dynamics: 0,
-            stars: 0,
+            wildcards: 0,
             param_names: Vec::new(),
         }
     }
@@ -37,9 +82,9 @@ impl Ord for Metadata {
             Ordering::Greater
         } else if self.dynamics < other.dynamics {
             Ordering::Less
-        } else if self.stars > other.stars {
+        } else if self.wildcards > other.wildcards {
             Ordering::Greater
-        } else if self.stars < other.stars {
+        } else if self.wildcards < other.wildcards {
             Ordering::Less
         } else {
             Ordering::Equal
@@ -57,32 +102,37 @@ impl PartialEq for Metadata {
     fn eq(&self, other: &Self) -> bool {
         self.statics == other.statics
             && self.dynamics == other.dynamics
-            && self.stars == other.stars
+            && self.wildcards == other.wildcards
     }
 }
 
-impl Eq for Metadata {}
-
+/// Router parameters.
 #[derive(PartialEq, Clone, Debug, Default)]
 pub struct Params {
     map: BTreeMap<String, String>,
 }
 
 impl Params {
+    /// Create a new instance of `Params`.
     pub fn new() -> Self {
         Self {
             map: BTreeMap::new(),
         }
     }
 
+    /// Insert a new param into `Params`.
     pub fn insert(&mut self, key: String, value: String) {
         self.map.insert(key, value);
     }
 
+    /// Find a param by name in `Params`.
     pub fn find(&self, key: &str) -> Option<&str> {
         self.map.get(key).map(|s| &s[..])
     }
 
+    /// Iterate over all named params.
+    ///
+    /// This will return all named params and named wildcards.
     pub fn iter(&self) -> Iter<'_> {
         Iter(self.map.iter())
     }
@@ -107,6 +157,8 @@ impl<'a> IntoIterator for &'a Params {
     }
 }
 
+/// An iterator over `Params`.
+#[derive(Debug)]
 pub struct Iter<'a>(btree_map::Iter<'a, String, String>);
 
 impl<'a> Iterator for Iter<'a> {
@@ -122,18 +174,44 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
+/// The result of a successful match returned by `Router::recognize`.
+#[derive(Debug)]
 pub struct Match<T> {
-    pub handler: T,
-    pub params: Params,
+    /// Return the endpoint handler.
+    handler: T,
+    /// Return the params.
+    params: Params,
 }
 
 impl<T> Match<T> {
+    /// Create a new instance of `Match`.
     pub fn new(handler: T, params: Params) -> Self {
         Self { handler, params }
     }
+
+    /// Get a handle to the handler.
+    pub fn handler(&self) -> &T {
+        &self.handler
+    }
+
+    /// Get a mutable handle to the handler.
+    pub fn handler_mut(&mut self) -> &mut T {
+        &mut self.handler
+    }
+
+    /// Get a handle to the params.
+    pub fn params(&self) -> &Params {
+        &self.params
+    }
+
+    /// Get a mutable handle to the params.
+    pub fn params_mut(&mut self) -> &mut Params {
+        &mut self.params
+    }
 }
 
-#[derive(Clone)]
+/// Recognizes URL patterns with support for dynamic and wildcard segments.
+#[derive(Clone, Debug)]
 pub struct Router<T> {
     nfa: NFA<Metadata>,
     handlers: BTreeMap<usize, T>,
@@ -164,6 +242,7 @@ fn segments(route: &str) -> Vec<(Option<char>, &str)> {
 }
 
 impl<T> Router<T> {
+    /// Create a new instance of `Router`.
     pub fn new() -> Self {
         Self {
             nfa: NFA::new(),
@@ -171,6 +250,7 @@ impl<T> Router<T> {
         }
     }
 
+    /// Add a route to the router.
     pub fn add(&mut self, mut route: &str, dest: T) {
         if !route.is_empty() && route.as_bytes()[0] == b'/' {
             route = &route[1..];
@@ -191,7 +271,7 @@ impl<T> Router<T> {
                 metadata.param_names.push(segment[1..].to_string());
             } else if !segment.is_empty() && segment.as_bytes()[0] == b'*' {
                 state = process_star_state(nfa, state);
-                metadata.stars += 1;
+                metadata.wildcards += 1;
                 metadata.param_names.push(segment[1..].to_string());
             } else {
                 state = process_static_segment(segment, nfa, state);
@@ -204,6 +284,7 @@ impl<T> Router<T> {
         self.handlers.insert(state, dest);
     }
 
+    /// Match a route on the router.
     pub fn recognize(&self, mut path: &str) -> Result<Match<&T>, String> {
         if !path.is_empty() && path.as_bytes()[0] == b'/' {
             path = &path[1..];
@@ -357,7 +438,7 @@ mod tests {
     }
 
     #[test]
-    fn star() {
+    fn wildcard() {
         let mut router = Router::new();
 
         router.add("*foo", "test".to_string());
@@ -377,7 +458,7 @@ mod tests {
     }
 
     #[test]
-    fn star_colon() {
+    fn wildcard_colon() {
         let mut router = Router::new();
 
         router.add("/a/*b", "ab".to_string());

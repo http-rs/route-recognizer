@@ -599,26 +599,16 @@ mod tests {
     fn add_or_update_with() {
         let mut router = Router::new();
 
-        router.add("/thomas", "Thomas".to_string());
-        router.add_or_update_with("/thomas", "Thomas".to_string(), |v| v.push_str("2"));
-
-        let m = router.recognize("/thomas").unwrap();
-
-        assert_eq!(*m.handler, "Thomas2".to_string());
-        assert_eq!(m.params, Params::new());
-
-        let mut router = Router::new();
-
-        router.add("/thomas", vec!["Thomas".to_string()]);
-        router.add_or_update_with("/thomas", vec!["Thomas".to_string()], |v| {
-            v.push("Thomas2".to_string())
+        router.add("/hello", vec!["GET".to_string()]);
+        router.add_or_update_with("/hello", vec!["POST".to_string()], |v| {
+            v.push("POST".to_string())
         });
 
-        let m = router.recognize("/thomas").unwrap();
+        let m = router.recognize("/hello").unwrap();
 
         assert_eq!(
             *m.handler,
-            vec!["Thomas".to_string(), "Thomas2".to_string()]
+            vec!["GET".to_string(), "POST".to_string()]
         );
         assert_eq!(m.params, Params::new());
     }

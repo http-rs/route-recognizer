@@ -142,7 +142,7 @@ impl Index<&str> for Params {
     type Output = String;
     fn index(&self, index: &str) -> &String {
         match self.map.get(index) {
-            None => panic!(format!("params[{}] did not exist", index)),
+            None => panic!("params[{}] did not exist", index),
             Some(s) => s,
         }
     }
@@ -251,7 +251,12 @@ impl<T> Router<T> {
     }
 
     /// Add a route to the router.
-    pub fn add(&mut self, mut route: &str, dest: T) {
+    pub fn add(&mut self, route: &str, dest: T) {
+        let state = self.add_state(route);
+        self.handlers.insert(state, dest);
+    }
+
+    fn add_state(&mut self, mut route: &str) -> usize {
         if !route.is_empty() && route.as_bytes()[0] == b'/' {
             route = &route[1..];
         }
@@ -281,7 +286,8 @@ impl<T> Router<T> {
 
         nfa.acceptance(state);
         nfa.metadata(state, metadata);
-        self.handlers.insert(state, dest);
+
+        state
     }
 
     /// Match a route on the router.
@@ -311,6 +317,15 @@ impl<T> Router<T> {
             }
             Err(str) => Err(str),
         }
+    }
+}
+
+impl<T: Default> Router<T> {
+    /// Returns a mutable reference to the route in the router by inserting the default value if empty.
+    pub fn at_or_default(&mut self, route: &str) -> &mut T {
+        let state = self.add_state(route);
+
+        self.handlers.entry(state).or_default()
     }
 }
 
@@ -570,5 +585,18 @@ mod tests {
             router.recognize("/foo%20bar").unwrap().handler().as_str(),
             "Hello"
         );
+    }
+
+    #[test]
+    fn add_or_update_with() {
+        let mut router = Router::new();
+
+        router.add("/hello", vec!["GET".to_string()]);
+        router.at_or_default("/hello").push("POST".to_string());
+
+        let m = router.recognize("/hello").unwrap();
+
+        assert_eq!(*m.handler, vec!["GET".to_string(), "POST".to_string()]);
+        assert_eq!(m.params, Params::new());
     }
 }

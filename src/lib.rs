@@ -571,4 +571,15 @@ mod tests {
             "Hello"
         );
     }
+
+    #[test]
+    fn test_chinese() {
+        let mut router = Router::new();
+        router.add("/crates/:foo/:bar", "Hello".to_string());
+
+        let m = router.recognize("/crates/实打实打算/d's'd").unwrap();
+        assert_eq!(m.handler().as_str(), "Hello");
+        assert_eq!(m.params().find("foo"), Some("实打实打算"));
+        assert_eq!(m.params().find("bar"), Some("d's'd"));
+    }
 }

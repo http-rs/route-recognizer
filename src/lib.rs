@@ -554,21 +554,4 @@ mod tests {
         let m = router.recognize("/4.static.static");
         assert!(m.is_err());
     }
-
-    #[test]
-    fn test_string_encoding() {
-        let mut router = Router::new();
-        router.add("/foo%2Fbar", "Hello".to_string());
-        router.add("/foo bar", "Hello".to_string());
-
-        // assert_eq!(
-        //     router.recognize("/foo%2fbar").unwrap().handler().as_str(),
-        //     "Hello"
-        // );
-
-        assert_eq!(
-            router.recognize("/foo%20bar").unwrap().handler().as_str(),
-            "Hello"
-        );
-    }
 }

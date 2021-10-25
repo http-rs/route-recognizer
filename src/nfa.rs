@@ -227,7 +227,7 @@ impl<T> NFA<T> {
     {
         let mut threads = vec![Thread::new()];
 
-        for (i, char) in string.chars().enumerate() {
+        for (i, char) in string.char_indices() {
             let next_threads = self.process_char(threads, char, i);
 
             if next_threads.is_empty() {

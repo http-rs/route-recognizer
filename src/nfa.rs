@@ -1,3 +1,9 @@
+use sgx_tstd as std;
+use std::{
+    string::{String, ToString},
+    vec::Vec,
+};
+
 use std::collections::HashSet;
 
 use self::CharacterClass::{Ascii, InvalidChars, ValidChars};

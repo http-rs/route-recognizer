@@ -44,9 +44,20 @@
 #![doc(html_favicon_url = "https://yoshuawuyts.com/assets/http-rs/favicon.ico")]
 #![doc(html_logo_url = "https://yoshuawuyts.com/assets/http-rs/logo-rounded.png")]
 
+
+// ensure we don't import any parts of the std library - we use sgx_tstd instead
+#![no_std]
+#[macro_use]
+extern crate sgx_tstd as std;
+
 use std::cmp::Ordering;
-use std::collections::{btree_map, BTreeMap};
+use std::collections::{btree_map, btree_map::BTreeMap};
 use std::ops::Index;
+
+use std::{
+    vec::Vec,
+    string::{String, ToString}
+};
 
 use crate::nfa::{CharacterClass, NFA};
 

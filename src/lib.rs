@@ -43,10 +43,20 @@
 #![doc(test(attr(allow(unused_extern_crates, unused_variables))))]
 #![doc(html_favicon_url = "https://yoshuawuyts.com/assets/http-rs/favicon.ico")]
 #![doc(html_logo_url = "https://yoshuawuyts.com/assets/http-rs/logo-rounded.png")]
+#![cfg_attr(not(feature = "std"), no_std)]
 
-use std::cmp::Ordering;
-use std::collections::{btree_map, BTreeMap};
-use std::ops::Index;
+#![cfg_attr(not(feature = "std"), macro_use)]
+extern crate alloc;
+
+use core::cmp::Ordering;
+use alloc::collections::{btree_map, BTreeMap};
+use core::ops::Index;
+
+#[cfg(not(feature = "std"))]
+use alloc::{
+    vec::Vec, vec,
+    string::{String, ToString}
+};
 
 use crate::nfa::{CharacterClass, NFA};
 
@@ -348,6 +358,12 @@ fn process_star_state<T>(nfa: &mut NFA<T>, mut state: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(not(feature = "std"))]
+    use alloc::{
+        vec::Vec, 
+        string::{String, ToString}
+    };    
+
     use super::{Params, Router};
 
     #[test]

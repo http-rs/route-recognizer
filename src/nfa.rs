@@ -1,4 +1,10 @@
-use std::collections::HashSet;
+use alloc::collections::BTreeSet;
+
+#[cfg(not(feature = "std"))]
+use alloc::{
+    vec::Vec, vec, format,
+    string::{String, ToString}
+};
 
 use self::CharacterClass::{Ascii, InvalidChars, ValidChars};
 
@@ -6,7 +12,7 @@ use self::CharacterClass::{Ascii, InvalidChars, ValidChars};
 pub struct CharSet {
     low_mask: u64,
     high_mask: u64,
-    non_ascii: HashSet<char>,
+    non_ascii: BTreeSet<char>,
 }
 
 impl CharSet {
@@ -14,7 +20,7 @@ impl CharSet {
         Self {
             low_mask: 0,
             high_mask: 0,
-            non_ascii: HashSet::new(),
+            non_ascii: BTreeSet::new(),
         }
     }
 
@@ -401,6 +407,9 @@ fn capture<T>(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
+
     use super::{CharSet, CharacterClass, NFA};
 
     #[test]

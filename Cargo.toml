@@ -8,3 +8,10 @@ edition = "2018"
 
 version = "0.3.1"
 authors = ["wycats", "rustasync"]
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+cfg-if = "1.0.0"
